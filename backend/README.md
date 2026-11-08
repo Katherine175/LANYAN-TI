@@ -291,6 +291,27 @@ configuraste `SERVER_PORT`. El indicador incluye la conectividad de la base de
 datos; una caída de PostgreSQL produce estado `DOWN` y HTTP `503` cuando la
 comprobación concluye.
 
+## Inicio rápido
+
+Con Docker Desktop abierto, desde la raíz y cada comando en su propia terminal:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\crear-admin.ps1      # solo la primera vez
+powershell -ExecutionPolicy Bypass -File scripts\iniciar-backend.ps1
+powershell -ExecutionPolicy Bypass -File scripts\iniciar-frontend.ps1
+```
+
+La aplicación queda en `http://127.0.0.1:8443`. Las demás cuentas se crean desde
+Administración → Usuarios.
+
+## Auditoría
+
+`audit_events` (V6) guarda inicios de sesión, intentos fallidos, cierres de sesión
+y cambios de cuentas y roles. Triggers de PostgreSQL rechazan `UPDATE`, `DELETE` y
+`TRUNCATE`, de modo que ni la aplicación puede alterar un registro. Se consulta en
+Administración → Auditoría o en `GET /api/v1/audit/events` (ADMIN + `audit:read`).
+Los módulos nuevos registran sus acciones con `AuditService.record`.
+
 ## Respaldo de la base local
 
 Desde la raíz del repositorio, con PostgreSQL activo:

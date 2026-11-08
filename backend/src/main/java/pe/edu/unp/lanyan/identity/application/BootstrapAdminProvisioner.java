@@ -6,6 +6,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.edu.unp.lanyan.audit.application.AuditService;
+import pe.edu.unp.lanyan.audit.domain.AuditAction;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.CreateUserRequest;
 import pe.edu.unp.lanyan.identity.domain.RoleName;
 import pe.edu.unp.lanyan.identity.domain.UserAccount;
@@ -19,10 +21,11 @@ public class BootstrapAdminProvisioner {
     private final PasswordEncoder passwords;
     private final Validator validator;
     private final JdbcTemplate jdbc;
+    private final AuditService audit;
 
     public BootstrapAdminProvisioner(UserAccountRepository users, RoleRepository roles, PasswordEncoder passwords,
-            Validator validator, JdbcTemplate jdbc) {
-        this.users = users; this.roles = roles; this.passwords = passwords; this.validator = validator; this.jdbc = jdbc;
+            Validator validator, JdbcTemplate jdbc, AuditService audit) {
+        this.users = users; this.roles = roles; this.passwords = passwords; this.validator = validator; this.jdbc = jdbc; this.audit = audit;
     }
 
     @Transactional
@@ -34,6 +37,7 @@ public class BootstrapAdminProvisioner {
         PasswordPolicy.validateNewPassword(password);
         var adminRoles = roles.findAllByNameIn(request.roles());
         if (adminRoles.size() != 1) throw new IllegalStateException("No se encuentra el rol administrador; revisa las migraciones.");
-        users.saveAndFlush(new UserAccount(fullName, email, passwords.encode(password), adminRoles));
+        var admin = users.saveAndFlush(new UserAccount(fullName, email, passwords.encode(password), adminRoles));
+        audit.record(AuditAction.ADMIN_BOOTSTRAPPED, "USER", admin.getId().toString(), null);
     }
 }

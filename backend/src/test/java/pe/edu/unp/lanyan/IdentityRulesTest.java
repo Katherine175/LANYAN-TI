@@ -46,7 +46,7 @@ class IdentityRulesTest {
         when(roles.findAllByNameIn(Set.of(RoleName.ROLE_STUDENT))).thenReturn(Set.of(role));
         when(encoder.encode(any())).thenReturn("encoded-test-hash");
         when(users.saveAndFlush(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        var service = new UserService(users, roles, encoder, mock(JdbcTemplate.class));
+        var service = new UserService(users, roles, encoder, mock(JdbcTemplate.class), mock(pe.edu.unp.lanyan.audit.application.AuditService.class));
         var view = service.create(new CreateUserRequest("Persona FICTICIA", "STUDENT@EXAMPLE.TEST",
                 "Fictitious-Password42!", Set.of(RoleName.ROLE_STUDENT)));
         assertThat(view.email()).isEqualTo("student@example.test");

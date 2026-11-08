@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, BarChart3, Bell, BookOpen, Check, CheckCircle2,
+  Activity, ArrowLeft, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
   ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, CreditCard,
   Gauge, GraduationCap, Headphones, KeyRound, LayoutDashboard, Lightbulb,
   LockKeyhole, LogOut, Mail, Menu, MessageSquare, Monitor, MoreHorizontal,
-  Plus, Projector, RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal,
-  Sparkles, TicketCheck, TrendingUp, UserCheck, Users, Wifi, Wrench, X, Zap,
+  Plus, Projector, RefreshCw, Search, Settings2, SlidersHorizontal, Sparkles,
+  TicketCheck, TrendingUp, UserCheck, Users, Wifi, Wrench, X, Zap,
   type LucideIcon,
 } from 'lucide-react'
-import { articles, monthlyData, problems, requests, services, tickets as initialTickets, users } from './data/mockData'
+import { articles, monthlyData, problems, requests, services, tickets as initialTickets } from './data/mockData'
 import type { Priority, Role, RouteKey, Ticket, TicketStatus, WorkflowRequest } from './types'
 import { Badge, Button, Card, Input, Modal, Progress, Select, Textarea } from './components/ui'
-
-const roleLabels: Record<Role, string> = { usuario: 'Usuario final', tecnico: 'Técnico TI', administrador: 'Administrador' }
+import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
+import { SESSION_EXPIRED_EVENT } from './services/api'
+import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, type Account } from './services/identityService'
 
 const navItems: { id: RouteKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
   { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, roles: ['usuario', 'tecnico', 'administrador'] },
@@ -38,7 +39,8 @@ const statusTone = (status: string) => {
 }
 
 function App() {
-  const [role, setRole] = useState<Role | null>(null)
+  const [account, setAccount] = useState<Account | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [route, setRoute] = useState<RouteKey>('dashboard')
   const [mobileMenu, setMobileMenu] = useState(false)
   const [ticketList, setTicketList] = useState<Ticket[]>(initialTickets)
@@ -56,6 +58,13 @@ function App() {
     return () => window.removeEventListener('hashchange', listener)
   }, [])
 
+  useEffect(() => {
+    currentAccount().then(setAccount).catch(() => setAccount(null)).finally(() => setCheckingSession(false))
+    const expired = () => setAccount(null)
+    window.addEventListener(SESSION_EXPIRED_EVENT, expired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired)
+  }, [])
+
   const navigate = (next: RouteKey) => {
     setRoute(next)
     setMobileMenu(false)
@@ -67,29 +76,44 @@ function App() {
     window.setTimeout(() => setToast(''), 2600)
   }
 
-  if (!role) return <Login onLogin={setRole} />
+  const role = account ? portalRole(account) : null
+  const allowed = role !== null && navItems.find((item) => item.id === route)?.roles.includes(role) === true
 
-  const allowed = navItems.find((item) => item.id === route)?.roles.includes(role)
-  if (!allowed) window.setTimeout(() => navigate('dashboard'), 0)
+  useEffect(() => {
+    if (role && !allowed) navigate('dashboard')
+  }, [role, allowed])
+
+  const closeSession = () => {
+    logout().catch(() => undefined).finally(() => {
+      setAccount(null)
+      setRoute('dashboard')
+      window.location.hash = ''
+    })
+  }
+
+  if (checkingSession) return <div className="boot-screen"><Logo /></div>
+  if (!account || !role) return <Login onLogin={setAccount} />
+
+  const view: RouteKey = allowed ? route : 'dashboard'
 
   return (
     <div className="app-shell">
-      <Sidebar role={role} route={route} onNavigate={navigate} open={mobileMenu} onClose={() => setMobileMenu(false)} onLogout={() => setRole(null)} />
+      <Sidebar role={role} route={view} onNavigate={navigate} open={mobileMenu} onClose={() => setMobileMenu(false)} onLogout={closeSession} />
       <div className="app-main">
-        <Header role={role} onMenu={() => setMobileMenu(true)} onRoleChange={setRole} />
+        <Header account={account} onMenu={() => setMobileMenu(true)} />
         <main className="page-wrap">
-          {route === 'dashboard' && <Dashboard onNavigate={navigate} tickets={ticketList} />}
-          {route === 'catalogo' && <Catalog notify={notify} onNavigate={navigate} />}
-          {route === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
-          {route === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
-          {route === 'problemas' && <Problems notify={notify} />}
-          {route === 'accesos' && <WorkflowPage mode="Acceso" items={requestList} setItems={setRequestList} notify={notify} />}
-          {route === 'solicitudes' && <WorkflowPage mode="Servicio" items={requestList} setItems={setRequestList} notify={notify} />}
-          {route === 'operaciones' && <Operations notify={notify} />}
-          {route === 'conocimiento' && <Knowledge notify={notify} />}
-          {route === 'reportes' && <Reports notify={notify} />}
-          {route === 'mejora' && <Improvement notify={notify} />}
-          {route === 'administracion' && <Administration notify={notify} />}
+          {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
+          {view === 'catalogo' && <Catalog notify={notify} onNavigate={navigate} />}
+          {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
+          {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
+          {view === 'problemas' && <Problems notify={notify} />}
+          {view === 'accesos' && <WorkflowPage mode="Acceso" items={requestList} setItems={setRequestList} notify={notify} />}
+          {view === 'solicitudes' && <WorkflowPage mode="Servicio" items={requestList} setItems={setRequestList} notify={notify} />}
+          {view === 'operaciones' && <Operations notify={notify} />}
+          {view === 'conocimiento' && <Knowledge notify={notify} />}
+          {view === 'reportes' && <Reports notify={notify} />}
+          {view === 'mejora' && <Improvement notify={notify} />}
+          {view === 'administracion' && <Administration notify={notify} />}
         </main>
       </div>
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
@@ -97,18 +121,25 @@ function App() {
   )
 }
 
-function Login({ onLogin }: { onLogin: (role: Role) => void }) {
-  const [selectedRole, setSelectedRole] = useState<Role>('usuario')
-  const [recover, setRecover] = useState(false)
-  const [message, setMessage] = useState('')
+function Login({ onLogin }: { onLogin: (account: Account) => void }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [help, setHelp] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (recover) {
-      setMessage('Enviamos las instrucciones a tu correo institucional.')
-      return
+    setBusy(true)
+    setError('')
+    try {
+      onLogin(await login(email, password))
+    } catch (e) {
+      setPassword('')
+      setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión.')
+    } finally {
+      setBusy(false)
     }
-    onLogin(selectedRole)
   }
 
   return (
@@ -121,9 +152,8 @@ function Login({ onLogin }: { onLogin: (role: Role) => void }) {
           <h1>Servicios que conectan a toda una comunidad.</h1>
           <p>La experiencia simple y humana para gestionar los servicios tecnológicos del Instituto de Idiomas.</p>
           <div className="login-metrics">
-            <div><strong>99.7%</strong><span>Disponibilidad</span></div>
-            <div><strong>18 min</strong><span>Respuesta media</span></div>
-            <div><strong>4.8/5</strong><span>Satisfacción</span></div>
+            <div><strong>ITIL 4</strong><span>Buenas prácticas</span></div>
+            <div><strong>ISO/IEC 20000</strong><span>Procesos de referencia</span></div>
           </div>
         </div>
         <p className="login-foot">Universidad Nacional de Piura · Instituto de Idiomas</p>
@@ -131,27 +161,15 @@ function Login({ onLogin }: { onLogin: (role: Role) => void }) {
       <section className="login-panel">
         <form className="login-form" onSubmit={submit}>
           <div className="mobile-brand"><Logo /><span>LANYAN TI</span></div>
-          <p className="eyebrow">{recover ? 'Recuperar acceso' : 'Bienvenido de vuelta'}</p>
-          <h2>{recover ? 'Restablece tu contraseña' : 'Ingresa a tu espacio'}</h2>
-          <p className="muted">{recover ? 'Te enviaremos un enlace seguro a tu correo.' : 'Utiliza tus credenciales institucionales.'}</p>
-          <label className="field-label">Correo institucional<Input type="email" defaultValue="usuario@unp.edu.pe" required /></label>
-          {!recover && <label className="field-label">Contraseña<Input type="password" defaultValue="lanyan2025" required /></label>}
-          {message && <div className="success-note"><CheckCircle2 size={17} />{message}</div>}
-          {!recover && <div className="form-between"><label className="check-label"><input type="checkbox" /> Recordarme</label><Button type="button" variant="ghost" onClick={() => setRecover(true)}>¿Olvidaste tu contraseña?</Button></div>}
-          <Button className="btn-wide" type="submit">{recover ? 'Enviar instrucciones' : 'Ingresar'}<ArrowRight size={17} /></Button>
-          {recover ? <Button type="button" variant="ghost" className="btn-wide" onClick={() => { setRecover(false); setMessage('') }}><ArrowLeft size={16} />Volver al inicio</Button> : (
-            <>
-              <div className="divider"><span>Acceso demostrativo</span></div>
-              <div className="role-grid">
-                {(['usuario', 'tecnico', 'administrador'] as Role[]).map((item) => (
-                  <Button type="button" variant="secondary" className={selectedRole === item ? 'role-active' : ''} onClick={() => setSelectedRole(item)} key={item}>
-                    {item === 'usuario' ? <Users size={18} /> : item === 'tecnico' ? <Wrench size={18} /> : <ShieldCheck size={18} />}
-                    <span>{roleLabels[item]}</span>{selectedRole === item && <Check size={15} />}
-                  </Button>
-                ))}
-              </div>
-            </>
-          )}
+          <p className="eyebrow">Bienvenido de vuelta</p>
+          <h2>Ingresa a tu espacio</h2>
+          <p className="muted">Utiliza tus credenciales institucionales.</p>
+          <label className="field-label">Correo institucional<Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+          <label className="field-label">Contraseña<Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+          {error && <div className="error-note" role="alert">{error}</div>}
+          {help && <div className="success-note"><CircleAlert size={17} />Para restablecer tu contraseña, comunícate con el Service Desk del Instituto.</div>}
+          <div className="form-between"><span /><Button type="button" variant="ghost" onClick={() => setHelp(true)}>¿Olvidaste tu contraseña?</Button></div>
+          <Button className="btn-wide" type="submit" disabled={busy}>{busy ? 'Verificando…' : 'Ingresar'}<ArrowRight size={17} /></Button>
         </form>
       </section>
     </div>
@@ -173,11 +191,11 @@ function Sidebar({ role, route, onNavigate, open, onClose, onLogout }: { role: R
           <p className="nav-label">Espacio de trabajo</p>
           {navItems.filter((item) => item.roles.includes(role)).map((item) => {
             const Icon = item.icon
-            return <Button variant="ghost" className={`nav-item ${route === item.id ? 'active' : ''}`} key={item.id} onClick={() => onNavigate(item.id)}><Icon size={18} /><span>{item.label}</span>{item.id === 'tickets' && <em>6</em>}</Button>
+            return <Button variant="ghost" className={`nav-item ${route === item.id ? 'active' : ''}`} key={item.id} onClick={() => onNavigate(item.id)}><Icon size={18} /><span>{item.label}</span></Button>
           })}
         </nav>
         <div className="sidebar-bottom">
-          <div className="support-card"><div className="support-icon"><Headphones size={18} /></div><strong>¿Necesitas ayuda?</strong><span>Contacta al Service Desk</span><Button variant="secondary">Abrir soporte</Button></div>
+          <div className="support-card"><div className="support-icon"><Headphones size={18} /></div><strong>¿Necesitas ayuda?</strong><span>Contacta al Service Desk</span><Button variant="secondary" onClick={() => onNavigate('tickets')}>Abrir soporte</Button></div>
           <Button variant="ghost" className="nav-item logout" onClick={onLogout}><LogOut size={18} />Cerrar sesión</Button>
         </div>
       </aside>
@@ -185,14 +203,13 @@ function Sidebar({ role, route, onNavigate, open, onClose, onLogout }: { role: R
   )
 }
 
-function Header({ role, onMenu, onRoleChange }: { role: Role; onMenu: () => void; onRoleChange: (role: Role) => void }) {
+function Header({ account, onMenu }: { account: Account; onMenu: () => void }) {
   return (
     <header className="topbar">
       <Button variant="ghost" className="menu-button icon-btn" onClick={onMenu}><Menu size={21} /></Button>
-      <div className="global-search"><Search size={18} /><Input placeholder="Buscar tickets, servicios, artículos..." /><kbd>⌘ K</kbd></div>
+      <div className="global-search"><Search size={18} /><Input placeholder="Buscar tickets, servicios, artículos..." /></div>
       <div className="top-actions">
-        <Button variant="ghost" className="icon-btn notification"><Bell size={19} /><i /></Button>
-        <div className="profile"><div className="avatar">AS</div><div><strong>Andrea Salazar</strong><Select value={role} onChange={(e) => onRoleChange(e.target.value as Role)}>{(['usuario', 'tecnico', 'administrador'] as Role[]).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}</Select></div></div>
+        <div className="profile"><div className="avatar">{initials(account.fullName)}</div><div><strong>{account.fullName}</strong><span className="profile-role">{mainRoleLabel(account)}</span></div></div>
       </div>
     </header>
   )
@@ -202,7 +219,17 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string;
   return <div className="page-header"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1><p>{description}</p></div>{action}</div>
 }
 
-function Dashboard({ onNavigate, tickets }: { onNavigate: (route: RouteKey) => void; tickets: Ticket[] }) {
+const greeting = () => {
+  const hour = new Date().getHours()
+  return hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+}
+
+const longDate = () => {
+  const text = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function Dashboard({ account, onNavigate, tickets }: { account: Account; onNavigate: (route: RouteKey) => void; tickets: Ticket[] }) {
   const stats = [
     { label: 'Tickets abiertos', value: '24', delta: '8% menos', icon: TicketCheck, tone: 'lavender' },
     { label: 'Resueltos este mes', value: '142', delta: '12% más', icon: CheckCircle2, tone: 'mint' },
@@ -211,7 +238,7 @@ function Dashboard({ onNavigate, tickets }: { onNavigate: (route: RouteKey) => v
   ]
   return (
     <>
-      <PageHeader eyebrow="Viernes, 14 de junio" title="Buenos días, Andrea" description="Aquí tienes el pulso de los servicios TI de hoy." action={<Button onClick={() => onNavigate('tickets')}><Plus size={17} />Nuevo ticket</Button>} />
+      <PageHeader eyebrow={longDate()} title={`${greeting()}, ${account.fullName.trim().split(/\s+/)[0]}`} description="Aquí tienes el pulso de los servicios TI de hoy." action={<Button onClick={() => onNavigate('tickets')}><Plus size={17} />Nuevo ticket</Button>} />
       <div className="stat-grid">{stats.map(({ label, value, delta, icon: Icon, tone }) => <Card className="stat-card" key={label}><div className={`stat-icon icon-${tone}`}><Icon size={20} /></div><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small>{delta.includes('menos') || delta.includes('más') || delta.includes('Meta') ? <TrendingUp size={13} /> : <CircleAlert size={13} />}{delta}</small></div><MoreHorizontal size={18} className="more" /></Card>)}</div>
       <div className="dashboard-grid">
         <Card className="chart-card">
@@ -421,18 +448,16 @@ function Improvement({ notify }: { notify: (message: string) => void }) {
 
 function Administration({ notify }: { notify: (message: string) => void }) {
   const [tab, setTab] = useState('Usuarios')
-  const [open, setOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
   return (
     <>
-      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={<Button onClick={() => setOpen(true)}><Plus size={17} />Añadir {tab === 'Usuarios' ? 'usuario' : 'registro'}</Button>} />
-      <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
-      {tab === 'Usuarios' && <Card className="table-card"><div className="card-title"><div><h2>Usuarios del sistema</h2><p>{users.length} cuentas registradas</p></div><div className="table-search small"><Search size={16} /><Input placeholder="Buscar usuario" /></div></div><div className="table-scroll"><table><thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><div className="person-cell"><div className="avatar">{user.name.split(' ').map((v) => v[0]).join('').slice(0, 2)}</div><strong>{user.name}</strong></div></td><td>{user.email}</td><td><Badge tone={user.role === 'administrador' ? 'lavender' : user.role === 'tecnico' ? 'blue' : 'neutral'}>{roleLabels[user.role]}</Badge></td><td><Badge tone={user.active ? 'mint' : 'neutral'}>{user.active ? 'Activo' : 'Inactivo'}</Badge></td><td><Button variant="ghost" className="icon-btn"><MoreHorizontal size={18} /></Button></td></tr>)}</tbody></table></div></Card>}
-      {tab === 'Roles y permisos' && <div className="role-cards">{(['usuario', 'tecnico', 'administrador'] as Role[]).map((role, index) => <Card key={role}><div className={`service-icon icon-${['mint', 'blue', 'lavender'][index]}`}>{index === 0 ? <Users size={22} /> : index === 1 ? <Wrench size={22} /> : <ShieldCheck size={22} />}</div><h3>{roleLabels[role]}</h3><p>{[18, 7, 3][index]} usuarios · {navItems.filter((item) => item.roles.includes(role)).length} módulos</p><div className="permission-list">{['Consultar servicios', 'Registrar solicitudes', ...(index > 0 ? ['Gestionar tickets', 'Visualizar reportes'] : []), ...(index > 1 ? ['Administrar usuarios'] : [])].map((permission) => <span key={permission}><Check size={14} />{permission}</span>)}</div><Button variant="secondary" onClick={() => notify(`Permisos de ${roleLabels[role]} abiertos`)}>Editar permisos</Button></Card>)}</div>}
+      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : undefined} />
+      <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Auditoría', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
+      {tab === 'Usuarios' && <UsersPanel creating={creating} onCloseCreate={() => setCreating(false)} notify={notify} />}
+      {tab === 'Roles y permisos' && <RolesPanel />}
+      {tab === 'Auditoría' && <AuditPanel />}
       {tab === 'Servicios' && <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>Servicio</th><th>Categoría</th><th>Disponibilidad</th><th>Respuesta</th><th>Estado</th></tr></thead><tbody>{services.map((service) => <tr key={service.id}><td><strong>{service.name}</strong><span>{service.id}</span></td><td>{service.category}</td><td>{service.availability}%</td><td>{service.responseTime}</td><td><Badge tone="mint">Activo</Badge></td></tr>)}</tbody></table></div></Card>}
       {tab === 'Configuración SLA' && <div className="sla-config">{[['Incidente crítico', '15 min', '2 horas'], ['Prioridad alta', '30 min', '4 horas'], ['Prioridad media', '2 horas', '8 horas'], ['Prioridad baja', '4 horas', '24 horas']].map((item, index) => <Card key={item[0]}><div><Badge tone={['danger', 'pink', 'blue', 'neutral'][index] as 'danger'}>{item[0]}</Badge><h3>{item[0]}</h3></div><label className="field-label">Primera respuesta<Input defaultValue={item[1]} /></label><label className="field-label">Resolución objetivo<Input defaultValue={item[2]} /></label><Button variant="secondary" onClick={() => notify('SLA actualizado')}>Guardar</Button></Card>)}</div>}
-      <Modal open={open} onClose={() => setOpen(false)} title={`Añadir ${tab === 'Usuarios' ? 'usuario' : 'registro'}`} footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={() => { setOpen(false); notify('Registro guardado correctamente') }}>Guardar</Button></>}>
-        <div className="form-grid"><label className="field-label">Nombre<Input placeholder="Nombre completo" /></label><label className="field-label">Correo<Input type="email" placeholder="usuario@unp.edu.pe" /></label></div><label className="field-label">Rol<Select><option>Usuario final</option><option>Técnico TI</option><option>Administrador</option></Select></label><label className="check-label"><input type="checkbox" defaultChecked /> Enviar invitación por correo</label>
-      </Modal>
     </>
   )
 }

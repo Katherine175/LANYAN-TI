@@ -22,7 +22,10 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import pe.edu.unp.lanyan.audit.application.AuditService;
+import pe.edu.unp.lanyan.audit.domain.AuditAction;
 import pe.edu.unp.lanyan.identity.infrastructure.AccountDetailsService;
+import pe.edu.unp.lanyan.identity.infrastructure.AccountPrincipal;
 import pe.edu.unp.lanyan.identity.infrastructure.CurrentAccountFilter;
 import pe.edu.unp.lanyan.identity.infrastructure.SecurityResponses;
 
@@ -55,7 +58,7 @@ public class SecurityConfiguration {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AccountDetailsService accounts,
-            HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf) throws Exception {
+            HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf, AuditService audit) throws Exception {
         return http
                 .csrf(config -> config.csrfTokenRepository(csrf))
                 .securityContext(config -> config.securityContextRepository(contexts))
@@ -71,6 +74,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/students/me/schedule", "/api/v1/students/me/materials").hasRole("STUDENT")
                         .requestMatchers("/api/v1/academic", "/api/v1/academic/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users", "/api/v1/users/**", "/api/v1/roles").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/audit", "/api/v1/audit/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -78,7 +82,12 @@ public class SecurityConfiguration {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(logout -> logout.logoutUrl("/api/v1/auth/logout")
                         .invalidateHttpSession(true).clearAuthentication(true).deleteCookies("LANYAN_SESSION")
-                        .logoutSuccessHandler((request, response, auth) -> response.setStatus(204)))
+                        .logoutSuccessHandler((request, response, auth) -> {
+                            if (auth != null && auth.getPrincipal() instanceof AccountPrincipal principal) {
+                                audit.recordAuthentication(AuditAction.LOGOUT, principal.getId(), principal.getUsername());
+                            }
+                            response.setStatus(204);
+                        }))
                 .addFilterBefore(new CurrentAccountFilter(accounts), AuthorizationFilter.class)
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, ex) -> SecurityResponses.write(response, 401, "AUTHENTICATION_REQUIRED"))

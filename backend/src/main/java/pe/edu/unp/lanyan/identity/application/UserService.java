@@ -16,6 +16,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.RoleView;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.edu.unp.lanyan.audit.application.AuditService;
+import pe.edu.unp.lanyan.audit.domain.AuditAction;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.CreateUserRequest;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.UserView;
 import pe.edu.unp.lanyan.identity.domain.Role;
@@ -32,12 +34,14 @@ public class UserService {
     private final RoleRepository roles;
     private final PasswordEncoder passwords;
     private final JdbcTemplate jdbc;
+    private final AuditService audit;
 
-    public UserService(UserAccountRepository users, RoleRepository roles, PasswordEncoder passwords, JdbcTemplate jdbc) {
+    public UserService(UserAccountRepository users, RoleRepository roles, PasswordEncoder passwords, JdbcTemplate jdbc, AuditService audit) {
         this.users = users;
         this.roles = roles;
         this.passwords = passwords;
         this.jdbc = jdbc;
+        this.audit = audit;
     }
 
     @Transactional
@@ -49,7 +53,9 @@ public class UserService {
             throw new IdentityException(HttpStatus.CONFLICT, "EMAIL_EXISTS", "El correo ya está registrado.");
         }
         var account = new UserAccount(request.fullName(), email, passwords.encode(request.password()), resolveRoles(request.roles()));
-        return view(users.saveAndFlush(account));
+        var created = view(users.saveAndFlush(account));
+        audit.record(AuditAction.USER_CREATED, "USER", created.id().toString(), "roles=" + created.roles());
+        return created;
     }
 
     @PreAuthorize("#id == authentication.principal.id or hasAuthority('identity:users:read')")
@@ -80,7 +86,9 @@ public class UserService {
                     "No puedes retirar tu propio rol de administrador.");
         }
         account.replaceRoles(resolved);
-        return view(users.saveAndFlush(account));
+        var updated = view(users.saveAndFlush(account));
+        audit.record(AuditAction.USER_ROLES_CHANGED, "USER", updated.id().toString(), "roles=" + updated.roles());
+        return updated;
     }
 
     @PreAuthorize("hasAuthority('identity:roles:assign')")

@@ -282,3 +282,10 @@ td:first-child strong, td:first-child span { display: block; } td:first-child st
   .sla-config { grid-template-columns: 1fr; }.sla-config > .card { grid-template-columns: 1fr; }
   .toast { right: 1rem; bottom: 1rem; left: 1rem; }
 }
+
+.boot-screen { display: grid; min-height: 100vh; place-items: center; background: var(--surface-2); }
+.error-note { margin: 1rem 0; padding: .8rem; color: #a3364a; background: #fdecef; border-radius: .75rem; font-size: .82rem; }
+.profile-role { display: block; margin-top: .1rem; color: var(--muted, #6f6c7d); font-size: .72rem; }
+.badge-row { display: flex; flex-wrap: wrap; gap: .3rem; }
+.pager { display: flex; align-items: center; gap: .6rem; font-size: .78rem; }
+.permission-list span { overflow-wrap: anywhere; }
