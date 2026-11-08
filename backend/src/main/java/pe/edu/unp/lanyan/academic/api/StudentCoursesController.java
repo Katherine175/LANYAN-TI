@@ -2,6 +2,7 @@ package pe.edu.unp.lanyan.academic.api;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.academic.api.AcademicDtos.*;
 import pe.edu.unp.lanyan.academic.application.EnrollmentService;
 import pe.edu.unp.lanyan.identity.infrastructure.AccountPrincipal;

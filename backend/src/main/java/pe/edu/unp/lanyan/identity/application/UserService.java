@@ -17,13 +17,13 @@ import pe.edu.unp.lanyan.identity.api.IdentityDtos.RoleView;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.CreateUserRequest;
-import pe.edu.unp.lanyan.identity.api.IdentityDtos.UserPage;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.UserView;
 import pe.edu.unp.lanyan.identity.domain.Role;
 import pe.edu.unp.lanyan.identity.domain.RoleName;
 import pe.edu.unp.lanyan.identity.domain.UserAccount;
 import pe.edu.unp.lanyan.identity.infrastructure.RoleRepository;
 import pe.edu.unp.lanyan.identity.infrastructure.UserAccountRepository;
+import pe.edu.unp.lanyan.shared.api.PageView;
 
 @Service
 @Transactional(readOnly = true)
@@ -56,13 +56,12 @@ public class UserService {
     public UserView current(UUID id) { return view(find(id)); }
 
     @PreAuthorize("hasAuthority('identity:users:read')")
-    public UserPage list(int page, int size) {
+    public PageView<UserView> list(int page, int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new IdentityException(HttpStatus.BAD_REQUEST, "INVALID_PAGE", "La página debe ser positiva y el tamaño entre 1 y 100.");
         }
-        var result = users.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id"))));
-        return new UserPage(result.map(UserService::view).getContent(), page, size,
-                result.getTotalElements(), result.getTotalPages());
+        return PageView.of(users.findAll(PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id"))))
+                .map(UserService::view));
     }
 
     @Transactional

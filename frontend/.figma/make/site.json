@@ -1,1 +1,6 @@
-{}
+{
+  "title": "LANYAN TI",
+  "description": "Portal académico y de servicios TI del Instituto de Idiomas de la Universidad Nacional de Piura.",
+  "language": "es",
+  "robots": { "index": false }
+}

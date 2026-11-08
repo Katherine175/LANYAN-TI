@@ -2,10 +2,8 @@ package pe.edu.unp.lanyan.academic.api;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 import jakarta.validation.constraints.*;
-import org.springframework.data.domain.Page;
 import pe.edu.unp.lanyan.academic.domain.*;
 
 public final class AcademicDtos {
@@ -33,9 +31,4 @@ public final class AcademicDtos {
     public record StudentCourseView(UUID enrollmentId, EnrollmentStatus enrollmentStatus, Instant enrolledAt,
             CourseView course, SectionView section) { }
 
-    public record PageView<T>(List<T> content, int page, int size, long totalElements, int totalPages) {
-        public static <T> PageView<T> of(Page<T> page) {
-            return new PageView<>(page.getContent(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
-        }
-    }
 }

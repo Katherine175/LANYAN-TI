@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.academic.api.AcademicDtos.*;
 import pe.edu.unp.lanyan.academic.domain.Course;
 import pe.edu.unp.lanyan.academic.infrastructure.CourseRepository;

@@ -33,9 +33,13 @@ react(),
       },
     },
     server: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      host: process.env.FIGMA_DEV_SERVER_HOST || '127.0.0.1',
       port: parseInt(process.env.PORT || '8443'),
       strictPort: true,
+      proxy: {
+        // Mismo origen para el navegador: la cookie de sesión funciona sin abrir CORS.
+        '/api': { target: process.env.LANYAN_API_URL || 'http://127.0.0.1:8080' },
+      },
       watch: {
         ignored: [
           '**/.figma/**',
@@ -43,7 +47,7 @@ react(),
       },
     },
     preview: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      host: process.env.FIGMA_DEV_SERVER_HOST || '127.0.0.1',
       port: parseInt(process.env.PORT || '8443'),
     },
   }

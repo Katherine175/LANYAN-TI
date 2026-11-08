@@ -1,16 +1,10 @@
 package pe.edu.unp.lanyan.identity.application;
 
 import org.springframework.http.HttpStatus;
+import pe.edu.unp.lanyan.shared.application.ApiException;
 
-public class IdentityException extends RuntimeException {
-    private final HttpStatus status;
-    private final String code;
-
+public class IdentityException extends ApiException {
     public IdentityException(HttpStatus status, String code, String message) {
-        super(message);
-        this.status = status;
-        this.code = code;
+        super(status, code, message);
     }
-    public HttpStatus status() { return status; }
-    public String code() { return code; }
 }

@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.*;
+import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.identity.application.UserService;
 import pe.edu.unp.lanyan.identity.infrastructure.AccountPrincipal;
 
@@ -24,7 +25,7 @@ public class UserController {
     }
 
     @GetMapping("/users")
-    public UserPage list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    public PageView<UserView> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return users.list(page, size);
     }
 

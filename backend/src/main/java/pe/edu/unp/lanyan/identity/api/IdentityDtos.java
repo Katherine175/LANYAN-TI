@@ -28,7 +28,6 @@ public final class IdentityDtos {
     public record AssignRolesRequest(@NotEmpty Set<@NotNull RoleName> roles) { }
     public record UserView(UUID id, String fullName, String email, boolean active,
             Set<RoleName> roles, Set<String> permissions) { }
-    public record UserPage(List<UserView> content, int page, int size, long totalElements, int totalPages) { }
     public record CsrfView(String token, String headerName) { }
     public record RoleView(RoleName name, Set<String> permissions) { }
 }

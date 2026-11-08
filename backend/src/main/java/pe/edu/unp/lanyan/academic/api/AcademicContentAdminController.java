@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.edu.unp.lanyan.academic.api.AcademicContentDtos.*;
-import pe.edu.unp.lanyan.academic.api.AcademicDtos.PageView;
+import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.academic.application.*;
 
 @RestController

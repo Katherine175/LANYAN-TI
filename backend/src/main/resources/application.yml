@@ -4,6 +4,11 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+      include-binding-errors: never
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -16,6 +21,7 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        default_batch_fetch_size: 50
         jdbc:
           time_zone: UTC
   flyway:
@@ -25,6 +31,7 @@ spring:
     clean-disabled: true
 
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
   servlet:
     session:
@@ -35,10 +42,6 @@ server:
         http-only: true
         same-site: lax
         secure: ${SESSION_COOKIE_SECURE:false}
-  error:
-    include-message: never
-    include-stacktrace: never
-    include-binding-errors: never
 
 management:
   endpoints:

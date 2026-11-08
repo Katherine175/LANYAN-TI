@@ -7,7 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.unp.lanyan.academic.api.AcademicContentDtos.*;
-import pe.edu.unp.lanyan.academic.api.AcademicDtos.PageView;
+import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.academic.domain.*;
 import pe.edu.unp.lanyan.academic.infrastructure.*;
 

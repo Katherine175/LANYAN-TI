@@ -81,6 +81,7 @@ Variables reconocidas:
 | `DB_USERNAME` | Sí | `lanyan_app` |
 | `DB_PASSWORD` | Sí | Contraseña local del usuario de PostgreSQL. |
 | `SERVER_PORT` | No | `8080` por defecto. |
+| `SERVER_ADDRESS` | No | `127.0.0.1` por defecto: solo esta computadora. |
 
 Hay dos referencias con propósitos diferentes:
 
@@ -249,6 +250,7 @@ Las pruebas fallan si Docker no está disponible; no se omiten silenciosamente.
 Resultado de Fase 2.3: `--offline verify` aprobó 173 pruebas (99 previas y 74
 nuevas), sin fallos, errores ni omisiones. El detalle y las comprobaciones de V5
 en PostgreSQL local están en [SCHEDULES_MATERIALS.md](SCHEDULES_MATERIALS.md).
+`ApiErrorResponsesTest` añade 6 pruebas sobre los códigos HTTP de error.
 Los resultados quedan en `target/surefire-reports/` y el JAR en
 `target/lanyan-ti-0.0.1-SNAPSHOT.jar`.
 
@@ -288,6 +290,28 @@ Respuesta HTTP esperada: `200`, con cuerpo `{"status":"UP"}`. Cambia el puerto s
 configuraste `SERVER_PORT`. El indicador incluye la conectividad de la base de
 datos; una caída de PostgreSQL produce estado `DOWN` y HTTP `503` cuando la
 comprobación concluye.
+
+## Respaldo de la base local
+
+Desde la raíz del repositorio, con PostgreSQL activo:
+
+```powershell
+powershell -File scripts\respaldar-bd.ps1
+powershell -File scripts\comprobar-respaldo.ps1 respaldos\ARCHIVO.dump
+```
+
+El primero guarda una copia en `respaldos/`, carpeta excluida de Git. El segundo
+la restaura en un contenedor desechable e informa tablas, migraciones y usuarios,
+sin tocar la base de desarrollo. Conviene respaldar antes de aplicar una migración
+nueva. Los respaldos contienen datos personales: no los compartas.
+
+## Errores de la API
+
+Todas las respuestas de error usan `application/problem+json` con `status` y `code`.
+El manejo común está en `shared.api.ApiExceptionHandler`; cada módulo define sus
+errores de negocio extendiendo `shared.application.ApiException`, y sus listados
+devuelven `shared.api.PageView`. `INTERNAL_ERROR` (500) se registra en el log y
+no revela detalles al cliente.
 
 ## Migraciones y seguridad
 
@@ -330,9 +354,8 @@ permite el desarrollo local con HTTP. Las funciones administrativas requieren
 Se devuelve `401` ante ausencia de autenticación y `403` ante permisos o CSRF
 insuficientes, sin redirecciones a formularios ni HTTP Basic.
 
-No se habilita CORS en esta fase: el frontend todavía no consume el backend.
-La futura integración usará un proxy del mismo origen o una lista explícita de
-orígenes autorizados; no se habilitará un comodín para peticiones con cookies.
+No se habilita CORS: Vite reenvía `/api` a `127.0.0.1:8080`, de modo que el
+navegador ve un solo origen y la cookie de sesión funciona sin abrir el backend.
 
 ## Problemas frecuentes
 
