@@ -297,9 +297,12 @@ Con Docker Desktop abierto, desde la raíz y cada comando en su propia terminal:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\crear-admin.ps1      # solo la primera vez
-powershell -ExecutionPolicy Bypass -File scripts\iniciar-backend.ps1
-powershell -ExecutionPolicy Bypass -File scripts\iniciar-frontend.ps1
+powershell -ExecutionPolicy Bypass -File scripts\iniciar-todo.ps1
 ```
+
+`iniciar-todo.ps1` abre el backend y la pantalla en dos ventanas y espera a que
+estén listos. También pueden iniciarse por separado con `iniciar-backend.ps1` e
+`iniciar-frontend.ps1`.
 
 La aplicación queda en `http://127.0.0.1:8443`. Las demás cuentas se crean desde
 Administración → Usuarios.
