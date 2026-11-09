@@ -1,2 +1,2 @@
-/** Reserva el módulo de catálogo de servicios; sin implementación funcional. */
+/** Catálogo de servicios TI: categorías, ciclo de vida y estado operativo. */
 package pe.edu.unp.lanyan.catalog;

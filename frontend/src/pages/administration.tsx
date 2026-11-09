@@ -138,6 +138,10 @@ const auditLabels: Record<string, { text: string; tone: 'lavender' | 'blue' | 'm
   ADMIN_BOOTSTRAPPED: { text: 'Administrador inicial', tone: 'lavender' },
   USER_CREATED: { text: 'Cuenta creada', tone: 'blue' },
   USER_ROLES_CHANGED: { text: 'Roles modificados', tone: 'pink' },
+  CATALOG_CATEGORY_CREATED: { text: 'Categoría creada', tone: 'blue' },
+  CATALOG_SERVICE_CREATED: { text: 'Servicio creado', tone: 'blue' },
+  CATALOG_SERVICE_UPDATED: { text: 'Servicio modificado', tone: 'pink' },
+  CATALOG_SERVICE_STATUS_CHANGED: { text: 'Estado operativo', tone: 'lavender' },
 }
 
 const dateFormat = new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'America/Lima' })

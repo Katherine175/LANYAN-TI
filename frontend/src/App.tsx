@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
-  ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, CreditCard,
-  Gauge, GraduationCap, Headphones, KeyRound, LayoutDashboard, Lightbulb,
-  LockKeyhole, LogOut, Mail, Menu, MessageSquare, Monitor, MoreHorizontal,
-  Plus, Projector, RefreshCw, Search, Settings2, SlidersHorizontal, Sparkles,
-  TicketCheck, TrendingUp, UserCheck, Users, Wifi, Wrench, X, Zap,
-  type LucideIcon,
+  ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, Gauge,
+  Headphones, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, LogOut, Menu,
+  MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings2,
+  SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck, Users,
+  Wrench, X, Zap, type LucideIcon,
 } from 'lucide-react'
 import { articles, monthlyData, problems, requests, services, tickets as initialTickets } from './data/mockData'
 import type { Priority, Role, RouteKey, Ticket, TicketStatus, WorkflowRequest } from './types'
-import { Badge, Button, Card, Input, Modal, Progress, Select, Textarea } from './components/ui'
+import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
+import { Catalog, ServicesPanel } from './pages/catalog'
 import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
 import { SESSION_EXPIRED_EVENT } from './services/api'
+import { listPublishedServices } from './services/catalogService'
 import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, type Account } from './services/identityService'
 
 const navItems: { id: RouteKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
@@ -103,7 +104,7 @@ function App() {
         <Header account={account} onMenu={() => setMobileMenu(true)} />
         <main className="page-wrap">
           {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
-          {view === 'catalogo' && <Catalog notify={notify} onNavigate={navigate} />}
+          {view === 'catalogo' && <Catalog canOperate={role !== 'usuario'} notify={notify} onNavigate={navigate} />}
           {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}
@@ -215,10 +216,6 @@ function Header({ account, onMenu }: { account: Account; onMenu: () => void }) {
   )
 }
 
-function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description: string; action?: ReactNode }) {
-  return <div className="page-header"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1><p>{description}</p></div>{action}</div>
-}
-
 const greeting = () => {
   const hour = new Date().getHours()
   return hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
@@ -260,38 +257,13 @@ function Dashboard({ account, onNavigate, tickets }: { account: Account; onNavig
   )
 }
 
-const serviceIcons: Record<string, LucideIcon> = { monitor: Monitor, graduation: GraduationCap, credit: CreditCard, mail: Mail, wifi: Wifi, projector: Projector, headset: Headphones }
-
-function Catalog({ notify, onNavigate }: { notify: (message: string) => void; onNavigate: (route: RouteKey) => void }) {
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('Todos')
-  const [selected, setSelected] = useState<(typeof services)[number] | null>(null)
-  const categories = ['Todos', ...new Set(services.map((service) => service.category))]
-  const filtered = services.filter((service) => (category === 'Todos' || service.category === category) && service.name.toLowerCase().includes(query.toLowerCase()))
-  return (
-    <>
-      <PageHeader eyebrow="Servicios para ti" title="Catálogo de servicios TI" description="Encuentra ayuda, solicita un servicio o reporta una interrupción." />
-      <div className="catalog-hero"><div><Sparkles size={21} /><h2>¿Qué necesitas resolver hoy?</h2><p>Busca por servicio, problema o palabra clave.</p></div><div className="hero-search"><Search size={19} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ej. No puedo ingresar al aula virtual" /></div></div>
-      <div className="filter-pills">{categories.map((item) => <Button key={item} variant={category === item ? 'primary' : 'secondary'} onClick={() => setCategory(item)}>{item}</Button>)}</div>
-      <div className="service-grid">{filtered.map((service, index) => {
-        const Icon = serviceIcons[service.icon] || Wrench
-        const tones = ['lavender', 'blue', 'mint', 'pink']
-        return <Card className="service-card" key={service.id} onClick={() => setSelected(service)}><div className={`service-icon icon-${tones[index % 4]}`}><Icon size={24} /></div><Badge>{service.category}</Badge><h3>{service.name}</h3><p>{service.description}</p><div className="service-meta"><span><Activity size={14} />{service.availability}% disponible</span><span><Clock3 size={14} />{service.responseTime}</span></div><Button variant="ghost">Ver opciones <ChevronRight size={16} /></Button></Card>
-      })}</div>
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.name || ''} footer={<><Button variant="secondary" onClick={() => setSelected(null)}>Cancelar</Button><Button onClick={() => { setSelected(null); notify('Solicitud iniciada correctamente'); onNavigate('tickets') }}>Solicitar servicio <ArrowRight size={16} /></Button></>}>
-        <div className="detail-callout"><div className="service-icon icon-lavender">{selected && (() => { const Icon = serviceIcons[selected.icon]; return <Icon size={24} /> })()}</div><div><strong>{selected?.description}</strong><p>Respuesta estimada: {selected?.responseTime} · Disponibilidad: {selected?.availability}%</p></div></div>
-        <label className="field-label">Cuéntanos qué necesitas<Textarea rows={4} placeholder="Describe brevemente tu solicitud..." /></label>
-        <label className="field-label">Urgencia<Select><option>Normal</option><option>Alta</option><option>Crítica</option></Select></label>
-      </Modal>
-    </>
-  )
-}
-
 function TicketsPage({ role, tickets, setTickets, notify }: { role: Role; tickets: Ticket[]; setTickets: (tickets: Ticket[]) => void; notify: (message: string) => void }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('Todos')
   const [createOpen, setCreateOpen] = useState(false)
   const [selected, setSelected] = useState<Ticket | null>(null)
+  const [serviceNames, setServiceNames] = useState<string[]>([])
+  useEffect(() => { listPublishedServices().then((page) => setServiceNames(page.content.map((service) => service.name))).catch(() => undefined) }, [])
   const [form, setForm] = useState({ title: '', service: 'Plataforma virtual', description: '', priority: 'Media' as Priority })
   const filtered = tickets.filter((ticket) => (status === 'Todos' || ticket.status === status) && `${ticket.title} ${ticket.id}`.toLowerCase().includes(query.toLowerCase()))
 
@@ -312,7 +284,7 @@ function TicketsPage({ role, tickets, setTickets, notify }: { role: Role; ticket
       <Card className="table-card"><div className="result-count"><strong>{filtered.length} tickets</strong><span>Actualizado hace unos segundos</span></div><TicketTable tickets={filtered} onSelect={setSelected} /></Card>
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Registrar nuevo ticket" footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button onClick={createTicket}>Registrar ticket</Button></>}>
         <label className="field-label">Asunto<Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Resume el problema en una frase" /></label>
-        <div className="form-grid"><label className="field-label">Servicio<Select value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}>{services.map((service) => <option key={service.id}>{service.name}</option>)}</Select></label><label className="field-label">Prioridad<Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Priority })}><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></Select></label></div>
+        <div className="form-grid"><label className="field-label">Servicio<Select value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}>{serviceNames.map((name) => <option key={name}>{name}</option>)}</Select></label><label className="field-label">Prioridad<Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Priority })}><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></Select></label></div>
         <label className="field-label">Descripción<Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Incluye los pasos, mensajes de error y cuándo comenzó..." /></label>
         <div className="upload-zone"><Plus size={20} /><strong>Adjuntar evidencia</strong><span>PNG, JPG o PDF hasta 10 MB</span></div>
       </Modal>
@@ -449,14 +421,15 @@ function Improvement({ notify }: { notify: (message: string) => void }) {
 function Administration({ notify }: { notify: (message: string) => void }) {
   const [tab, setTab] = useState('Usuarios')
   const [creating, setCreating] = useState(false)
+  const [creatingService, setCreatingService] = useState(false)
   return (
     <>
-      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : undefined} />
+      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : tab === 'Servicios' ? <Button onClick={() => setCreatingService(true)}><Plus size={17} />Añadir servicio</Button> : undefined} />
       <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Auditoría', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
       {tab === 'Usuarios' && <UsersPanel creating={creating} onCloseCreate={() => setCreating(false)} notify={notify} />}
       {tab === 'Roles y permisos' && <RolesPanel />}
       {tab === 'Auditoría' && <AuditPanel />}
-      {tab === 'Servicios' && <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>Servicio</th><th>Categoría</th><th>Disponibilidad</th><th>Respuesta</th><th>Estado</th></tr></thead><tbody>{services.map((service) => <tr key={service.id}><td><strong>{service.name}</strong><span>{service.id}</span></td><td>{service.category}</td><td>{service.availability}%</td><td>{service.responseTime}</td><td><Badge tone="mint">Activo</Badge></td></tr>)}</tbody></table></div></Card>}
+      {tab === 'Servicios' && <ServicesPanel creating={creatingService} onCloseCreate={() => setCreatingService(false)} notify={notify} />}
       {tab === 'Configuración SLA' && <div className="sla-config">{[['Incidente crítico', '15 min', '2 horas'], ['Prioridad alta', '30 min', '4 horas'], ['Prioridad media', '2 horas', '8 horas'], ['Prioridad baja', '4 horas', '24 horas']].map((item, index) => <Card key={item[0]}><div><Badge tone={['danger', 'pink', 'blue', 'neutral'][index] as 'danger'}>{item[0]}</Badge><h3>{item[0]}</h3></div><label className="field-label">Primera respuesta<Input defaultValue={item[1]} /></label><label className="field-label">Resolución objetivo<Input defaultValue={item[2]} /></label><Button variant="secondary" onClick={() => notify('SLA actualizado')}>Guardar</Button></Card>)}</div>}
     </>
   )

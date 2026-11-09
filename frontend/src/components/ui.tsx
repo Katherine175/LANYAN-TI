@@ -41,3 +41,7 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
 export function Progress({ value, tone = 'lavender' }: { value: number; tone?: 'lavender' | 'blue' | 'mint' | 'pink' }) {
   return <div className="progress"><span className={`progress-${tone}`} style={{ width: `${Math.min(value, 100)}%` }} /></div>
 }
+
+export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description: string; action?: ReactNode }) {
+  return <div className="page-header"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1><p>{description}</p></div>{action}</div>
+}

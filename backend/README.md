@@ -312,6 +312,14 @@ y cambios de cuentas y roles. Triggers de PostgreSQL rechazan `UPDATE`, `DELETE`
 Administración → Auditoría o en `GET /api/v1/audit/events` (ADMIN + `audit:read`).
 Los módulos nuevos registran sus acciones con `AuditService.record`.
 
+## Catálogo de servicios
+
+V7 crea `catalog_categories` y `catalog_services` con el catálogo inicial del diseño.
+Todos los roles del portal consultan los servicios `PUBLISHED`; ADMIN crea, edita y
+retira en `/api/v1/catalog/admin/**`. ADMIN y TECHNICIAN actualizan el estado
+operativo en `PUT /api/v1/catalog/services/{id}/operational-status`. Los servicios no
+se borran: se retiran, y cada cambio queda en la auditoría.
+
 ## Respaldo de la base local
 
 Desde la raíz del repositorio, con PostgreSQL activo:
