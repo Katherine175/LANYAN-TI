@@ -30,5 +30,12 @@ public final class TicketDtos {
     public record TicketView(UUID id, String code, String title, String description, ServiceRef service,
             String requesterName, String requesterEmail, String assigneeName, ServicePriority priority, TicketStatus status,
             Instant createdAt, Instant firstResponseDue, Instant resolutionDue, Instant firstRespondedAt, Instant resolvedAt,
-            SlaState firstResponseSla, SlaState resolutionSla, int resolutionElapsedPercent, Long version) { }
+            SlaState firstResponseSla, SlaState resolutionSla, int resolutionElapsedPercent, Long version, String problemCode) { }
+
+    /** {@code internal} ausente = comentario visible para el solicitante. */
+    public record CommentRequest(@NotBlank @Size(max = 2000) String body, Boolean internal) {
+        public boolean isInternal() { return Boolean.TRUE.equals(internal); }
+    }
+
+    public record CommentView(UUID id, String authorName, boolean staff, boolean internal, String body, Instant createdAt) { }
 }

@@ -27,6 +27,14 @@ import pe.edu.unp.lanyan.tickets.api.TicketDtos.TicketView;
 import pe.edu.unp.lanyan.tickets.domain.Ticket;
 import pe.edu.unp.lanyan.tickets.domain.TicketStatus;
 import pe.edu.unp.lanyan.tickets.infrastructure.TicketRepository;
+import pe.edu.unp.lanyan.tickets.infrastructure.TicketCommentRepository;
+import pe.edu.unp.lanyan.tickets.domain.TicketComment;
+import pe.edu.unp.lanyan.tickets.api.TicketDtos.CommentView;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Gestión de incidentes (ITIL: Operación del servicio; ISO/IEC 20000-1, 8.6.1).
@@ -42,18 +50,20 @@ public class TicketService {
     private final SlaPolicies policies;
     private final BusinessHours hours;
     private final AuditService audit;
+    private final TicketCommentRepository comments;
+    private final JdbcTemplate jdbc;
     private final Clock clock;
 
     @Autowired
     public TicketService(TicketRepository tickets, ItServiceRepository services, UserAccountRepository users,
-            SlaPolicies policies, BusinessHours hours, AuditService audit) {
-        this(tickets, services, users, policies, hours, audit, Clock.systemUTC());
+            SlaPolicies policies, BusinessHours hours, AuditService audit, TicketCommentRepository comments, JdbcTemplate jdbc) {
+        this(tickets, services, users, policies, hours, audit, comments, jdbc, Clock.systemUTC());
     }
 
     TicketService(TicketRepository tickets, ItServiceRepository services, UserAccountRepository users,
-            SlaPolicies policies, BusinessHours hours, AuditService audit, Clock clock) {
+            SlaPolicies policies, BusinessHours hours, AuditService audit, TicketCommentRepository comments, JdbcTemplate jdbc, Clock clock) {
         this.tickets = tickets; this.services = services; this.users = users;
-        this.policies = policies; this.hours = hours; this.audit = audit; this.clock = clock;
+        this.policies = policies; this.hours = hours; this.audit = audit; this.comments = comments; this.jdbc = jdbc; this.clock = clock;
     }
 
     @Transactional
@@ -77,12 +87,12 @@ public class TicketService {
 
     @PreAuthorize("hasAuthority('tickets:read:self') and #userId == authentication.principal.id")
     public PageView<TicketView> mine(UUID userId, int page, int size) {
-        return PageView.of(tickets.findByRequester_Id(userId, pagination(page, size)).map(this::view));
+        return withProblems(tickets.findByRequester_Id(userId, pagination(page, size)));
     }
 
     @PreAuthorize("hasAuthority('tickets:manage')")
     public PageView<TicketView> all(int page, int size) {
-        return PageView.of(tickets.findAll(pagination(page, size)).map(this::view));
+        return withProblems(tickets.findAll(pagination(page, size)));
     }
 
     /** El solicitante ve su ticket; un ticket ajeno responde como inexistente. */
@@ -140,9 +150,85 @@ public class TicketService {
         return view(saved);
     }
 
+    /** Comentarios visibles: el solicitante no ve las notas internas de TI. */
+    @PreAuthorize("isAuthenticated()")
+    public List<CommentView> comments(UUID id, UUID userId, boolean manager) {
+        visible(id, userId, manager);
+        var list = manager ? comments.findByTicket_IdOrderByCreatedAt(id) : comments.findByTicket_IdAndInternalFalseOrderByCreatedAt(id);
+        return list.stream().map(TicketService::commentView).toList();
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('tickets:comment') and #userId == authentication.principal.id")
+    public CommentView comment(UUID id, UUID userId, boolean manager, String body, boolean internal) {
+        visible(id, userId, manager);
+        if (internal && !manager) throw new ApiException(HttpStatus.FORBIDDEN, "INTERNAL_NOTE_FORBIDDEN", "Solo el equipo de TI escribe notas internas.");
+        var ticket = locked(id);
+        var author = users.findById(userId).orElseThrow();
+        var now = Instant.now(clock);
+        // Responderle al solicitante cuenta como primera respuesta; una nota interna no.
+        if (manager && !internal) ticket.markFirstResponse(now);
+        TicketComment saved;
+        try {
+            saved = comments.saveAndFlush(new TicketComment(ticket, author, author.getFullName(), manager, internal, body, now));
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_COMMENT", ex.getMessage());
+        }
+        tickets.saveAndFlush(ticket);
+        audit.record(AuditAction.TICKET_COMMENTED, "TICKET", id.toString(), ticket.getCode() + (internal ? "; nota interna" : "; comentario"));
+        return commentView(saved);
+    }
+
+    /** Lo usa la gestión de problemas al aplicar la solución definitiva: resuelve los incidentes vinculados abiertos. */
+    @Transactional
+    @PreAuthorize("hasAuthority('problems:manage') and #actorId == authentication.principal.id")
+    public int resolveByProblem(Collection<UUID> ticketIds, String problemCode, String solution, UUID actorId) {
+        var actor = users.findById(actorId).orElseThrow();
+        int resolved = 0;
+        for (var id : ticketIds) {
+            var ticket = locked(id);
+            if (ticket.getStatus() == TicketStatus.RESOLVED) continue;
+            var now = Instant.now(clock);
+            var previous = ticket.getStatus();
+            if (ticket.getAssignee() == null) ticket.assignTo(actor, now);
+            ticket.changeStatus(TicketStatus.RESOLVED, now);
+            tickets.saveAndFlush(ticket);
+            comments.saveAndFlush(new TicketComment(ticket, actor, actor.getFullName(), true, false,
+                    "Resuelto con la solución definitiva del problema " + problemCode + ": " + solution.trim(), now));
+            audit.record(AuditAction.TICKET_STATUS_CHANGED, "TICKET", id.toString(), ticket.getCode() + "; " + previous + " a RESOLVED; problema=" + problemCode);
+            resolved++;
+        }
+        return resolved;
+    }
+
+    private void visible(UUID id, UUID userId, boolean manager) {
+        tickets.findById(id).filter(t -> manager || (t.getRequester() != null && t.getRequester().getId().equals(userId)))
+                .orElseThrow(TicketService::notFound);
+    }
+
+    private static CommentView commentView(TicketComment c) {
+        return new CommentView(c.getId(), c.getAuthorName(), c.isStaff(), c.isInternal(), c.getBody(), c.getCreatedAt());
+    }
+
+    private PageView<TicketView> withProblems(org.springframework.data.domain.Page<Ticket> page) {
+        var codes = problemCodes(page.getContent().stream().map(Ticket::getId).toList());
+        return PageView.of(page.map(t -> view(t, codes.get(t.getId()))));
+    }
+
+    private Map<UUID, String> problemCodes(List<UUID> ticketIds) {
+        var result = new HashMap<UUID, String>();
+        if (ticketIds.isEmpty()) return result;
+        var marks = String.join(",", java.util.Collections.nCopies(ticketIds.size(), "?"));
+        jdbc.query("SELECT pi.ticket_id, p.code FROM problem_incidents pi JOIN problems p ON p.id = pi.problem_id WHERE pi.ticket_id IN (" + marks + ")",
+                rs -> { result.put(rs.getObject(1, UUID.class), rs.getString(2)); }, ticketIds.toArray());
+        return result;
+    }
+
     private Ticket locked(UUID id) { return tickets.findForUpdate(id).orElseThrow(TicketService::notFound); }
 
-    private TicketView view(Ticket t) {
+    private TicketView view(Ticket t) { return view(t, problemCodes(List.of(t.getId())).get(t.getId())); }
+
+    private TicketView view(Ticket t, String problemCode) {
         var now = Instant.now(clock);
         var service = t.getService();
         var resolutionEnd = t.getResolvedAt() == null ? now : t.getResolvedAt();
@@ -154,7 +240,7 @@ public class TicketService {
                 t.getRequesterName(), t.getRequesterEmail(), t.getAssigneeName(), t.getPriority(), t.getStatus(),
                 t.getCreatedAt(), t.getFirstResponseDue(), t.getResolutionDue(), t.getFirstRespondedAt(), t.getResolvedAt(),
                 state(t.getCreatedAt(), t.getFirstResponseDue(), t.getFirstRespondedAt(), now),
-                state(t.getCreatedAt(), t.getResolutionDue(), t.getResolvedAt(), now), percent, t.getVersion());
+                state(t.getCreatedAt(), t.getResolutionDue(), t.getResolvedAt(), now), percent, t.getVersion(), problemCode);
     }
 
     private SlaState state(Instant start, Instant due, Instant done, Instant now) {

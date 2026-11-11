@@ -25,6 +25,16 @@ export interface Ticket {
   resolutionSla: SlaState
   resolutionElapsedPercent: number
   version: number
+  problemCode: string | null
+}
+
+export interface TicketComment {
+  id: string
+  authorName: string
+  staff: boolean
+  internal: boolean
+  body: string
+  createdAt: string
 }
 
 export interface SlaPolicy {
@@ -81,6 +91,10 @@ export const takeTicket = (id: string) => api<Ticket>(`/tickets/${id}/take`, { m
 export const changeTicketStatus = (id: string, status: TicketStatus) => api<Ticket>(`/tickets/${id}/status`, { method: 'PUT', body: { status } })
 export const changeTicketPriority = (id: string, priority: Priority, reason: string) =>
   api<Ticket>(`/tickets/${id}/priority`, { method: 'PUT', body: { priority, reason } })
+
+export const ticketComments = (id: string) => api<TicketComment[]>(`/tickets/${id}/comments`)
+export const addTicketComment = (id: string, body: string, internal: boolean) =>
+  api<TicketComment>(`/tickets/${id}/comments`, { method: 'POST', body: { body, internal } })
 
 export const listSlaPolicies = () => api<SlaPolicy[]>('/sla/policies')
 export const updateSlaPolicy = (priority: Priority, body: { firstResponseMinutes: number; resolutionMinutes: number; version: number }) =>

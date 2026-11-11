@@ -91,6 +91,9 @@ public class SecurityConfiguration {
                         // Cada operación exige además su permiso con @PreAuthorize.
                         .requestMatchers("/api/v1/service-requests", "/api/v1/service-requests/**").authenticated()
                         .requestMatchers("/api/v1/access/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/*/comments").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tickets/*/comments").authenticated()
+                        .requestMatchers("/api/v1/problems", "/api/v1/problems/**").hasAnyRole("TECHNICIAN", "ADMIN")
                         .anyRequest().denyAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(AbstractHttpConfigurer::disable)

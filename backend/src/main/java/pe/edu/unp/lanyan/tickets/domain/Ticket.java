@@ -53,8 +53,13 @@ public class Ticket {
         this.updatedAt = createdAt;
     }
 
-    /** La primera acción de un técnico cuenta como primera respuesta. */
-    private void markFirstResponse(Instant now) { if (firstRespondedAt == null) firstRespondedAt = now; }
+    /** La primera acción de un técnico (tomarlo, moverlo o responderle al solicitante) cuenta como primera respuesta. */
+    public void markFirstResponse(Instant now) {
+        if (firstRespondedAt == null) {
+            firstRespondedAt = now;
+            updatedAt = now;
+        }
+    }
 
     public void assignTo(UserAccount technician, Instant now) {
         this.assignee = technician;

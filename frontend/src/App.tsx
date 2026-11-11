@@ -3,15 +3,16 @@ import {
   Activity, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
   ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, Gauge,
   Headphones, KeyRound, LayoutDashboard, Lightbulb, LogOut, Menu,
-  Plus, RefreshCw, Search, Settings2,
-  SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck,
+  Plus, Search, Settings2,
+  SlidersHorizontal, Sparkles, TicketCheck, TrendingUp,
   Wrench, X, Zap, GraduationCap, type LucideIcon,
 } from 'lucide-react'
-import { articles, problems, services } from './data/mockData'
+import { articles, services } from './data/mockData'
 import type { Role, RouteKey } from './types'
 import { AccessPage, ServiceRequestsPage } from './pages/workflows'
+import { ProblemsPage } from './pages/problems'
 import { DashboardTickets, isStaff, ServiceDesk, SlaConfigPanel, TicketsPage, useTickets, useTicketStats } from './pages/tickets'
-import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
+import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
 import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
 import { CourseCatalog, CoursesPanel, MyCourses } from './pages/courses'
@@ -111,7 +112,7 @@ function App() {
           {view === 'mis-cursos' && <MyCourses onOpenCatalog={() => navigate('cursos')} notify={notify} />}
           {view === 'tickets' && <TicketsPage role={role} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk notify={notify} />}
-          {view === 'problemas' && <Problems notify={notify} />}
+          {view === 'problemas' && <ProblemsPage notify={notify} />}
           {view === 'accesos' && <AccessPage role={role} email={account.email} notify={notify} />}
           {view === 'solicitudes' && <ServiceRequestsPage role={role} email={account.email} notify={notify} />}
           {view === 'operaciones' && <Operations notify={notify} />}
@@ -262,23 +263,6 @@ function Dashboard({ account, role, onNavigate }: { account: Account; role: Role
         <div className="card-title"><div><h2>Actividad reciente</h2><p>{staff ? 'Últimos tickets registrados' : 'Tus últimos tickets'}</p></div><Button variant="ghost" onClick={() => onNavigate('tickets')}>Ver todos <ArrowRight size={16} /></Button></div>
         <DashboardTickets tickets={tickets} />
       </Card>
-    </>
-  )
-}
-
-function Problems({ notify }: { notify: (message: string) => void }) {
-  const [selected, setSelected] = useState<(typeof problems)[number] | null>(null)
-  return (
-    <>
-      <PageHeader eyebrow="Gestión proactiva" title="Problemas" description="Identifica patrones, elimina causas raíz y previene nuevos incidentes." action={<Button onClick={() => notify('Nuevo análisis de problema iniciado')}><Plus size={17} />Nuevo problema</Button>} />
-      <div className="stat-grid three"><Card className="mini-stat"><CircleAlert size={20} /><span>Problemas activos</span><strong>7</strong></Card><Card className="mini-stat"><RefreshCw size={20} /><span>Incidentes vinculados</span><strong>37</strong></Card><Card className="mini-stat"><CheckCircle2 size={20} /><span>Resueltos este mes</span><strong>12</strong></Card></div>
-      <div className="problem-list">{problems.map((problem) => <Card className="problem-card" key={problem.id} onClick={() => setSelected(problem)}><div className="problem-id"><span>{problem.id}</span><Badge tone={statusTone(problem.status)}>{problem.status}</Badge></div><div><h3>{problem.title}</h3><p><strong>Causa:</strong> {problem.cause}</p></div><div className="problem-meta"><span><RefreshCw size={15} />{problem.incidents} incidentes</span><span><UserCheck size={15} />{problem.owner}</span><ChevronRight size={18} /></div></Card>)}</div>
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={`Análisis de causa raíz · ${selected?.id}`} footer={<><Button variant="secondary" onClick={() => setSelected(null)}>Guardar borrador</Button><Button onClick={() => { setSelected(null); notify('Análisis actualizado') }}>Actualizar problema</Button></>}>
-        <div className="detail-callout"><Lightbulb size={24} /><div><strong>{selected?.title}</strong><p>{selected?.incidents} incidentes asociados · Responsable: {selected?.owner}</p></div></div>
-        <label className="field-label">Causa raíz<Textarea rows={3} defaultValue={selected?.cause} /></label>
-        <label className="field-label">Solución permanente<Textarea rows={4} placeholder="Documenta la acción correctiva..." /></label>
-        <div className="form-grid"><label className="field-label">Estado<Select defaultValue={selected?.status}><option>Investigando</option><option>Causa identificada</option><option>Resuelto</option></Select></label><label className="field-label">Fecha objetivo<Input type="date" defaultValue="2025-06-21" /></label></div>
-      </Modal>
     </>
   )
 }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, ChevronRight, CircleAlert, Clock3, Hand, Plus, Search, ShieldAlert, Timer } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronRight, CircleAlert, Clock3, Hand, Lightbulb, LockKeyhole, MessageSquare, Plus, Search, ShieldAlert, Timer } from 'lucide-react'
+import { knownErrors, type KnownError } from '../services/problemService'
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from '../components/ui'
 import type { Role } from '../types'
 import { formatMinutes, listPublishedServices, type CatalogService } from '../services/catalogService'
 import {
-  ago, allTickets, changeTicketPriority, changeTicketStatus, createTicket, formatDateTime, listSlaPolicies, myTickets, priorityLabels,
-  SLA_HOURS_TEXT, slaLabels, statusLabels, statusOrder, takeTicket, updateSlaPolicy,
-  type Priority, type SlaPolicy, type Ticket, type TicketStatus,
+  addTicketComment, ago, allTickets, changeTicketPriority, changeTicketStatus, createTicket, formatDateTime, listSlaPolicies, myTickets, priorityLabels,
+  SLA_HOURS_TEXT, slaLabels, statusLabels, statusOrder, takeTicket, ticketComments, updateSlaPolicy,
+  type Priority, type SlaPolicy, type Ticket, type TicketComment, type TicketStatus,
 } from '../services/ticketService'
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : 'No se pudo completar la operación.')
@@ -172,6 +173,7 @@ function TicketDetail({ ticket, staff, onClose, onChanged }: { ticket: Ticket; s
         <div><span>Técnico</span><strong>{ticket.assigneeName ?? 'Sin asignar'}</strong></div>
         <div><span>Solicitante</span><strong>{ticket.requesterName}</strong></div>
         <div><span>Registrado</span><strong>{formatDateTime(ticket.createdAt)}</strong></div>
+        {ticket.problemCode && <div><span>Problema asociado</span><strong>{ticket.problemCode}</strong></div>}
       </div>
       {ticket.description && <p className="course-description">{ticket.description}</p>}
       <div className="deadlines">
@@ -198,8 +200,67 @@ function TicketDetail({ ticket, staff, onClose, onChanged }: { ticket: Ticket; s
             : <Button variant="ghost" onClick={() => setReprioritizing(true)}><ShieldAlert size={16} />Cambiar prioridad</Button>}
         </div>
       )}
+      {staff && ticket.status !== 'RESOLVED' && <KnownErrors serviceId={ticket.service.id} />}
+      <Comments ticket={ticket} staff={staff} onPosted={(updated) => onChanged(updated, 'Comentario agregado')} />
       {error && <div className="error-note">{error}</div>}
     </Modal>
+  )
+}
+
+/** Errores conocidos del servicio: la solución temporal que el técnico puede aplicar ya. */
+function KnownErrors({ serviceId }: { serviceId: string }) {
+  const [items, setItems] = useState<KnownError[]>([])
+  useEffect(() => { knownErrors(serviceId).then(setItems).catch(() => setItems([])) }, [serviceId])
+  if (items.length === 0) return null
+  return (
+    <div className="known-errors">
+      <strong><Lightbulb size={15} />Errores conocidos de este servicio</strong>
+      {items.map((item) => <p key={item.id}><b>{item.code}:</b> {item.title}. <b>Solución temporal:</b> {item.workaround}</p>)}
+    </div>
+  )
+}
+
+function Comments({ ticket, staff, onPosted }: { ticket: Ticket; staff: boolean; onPosted: (ticket: Ticket) => void }) {
+  const [items, setItems] = useState<TicketComment[]>([])
+  const [body, setBody] = useState('')
+  const [internal, setInternal] = useState(false)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const load = () => ticketComments(ticket.id).then(setItems).catch((e) => setError(errorText(e)))
+  useEffect(() => { void load() }, [ticket.id])
+
+  const post = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await addTicketComment(ticket.id, body, internal)
+      setBody('')
+      setInternal(false)
+      await load()
+      // Responder al solicitante puede marcar la primera respuesta: se refresca el ticket.
+      const refreshed = await (staff ? allTickets() : myTickets())
+      const updated = refreshed.content.find((item) => item.id === ticket.id)
+      if (updated) onPosted(updated)
+    } catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="comments">
+      <h3 className="course-subtitle"><MessageSquare size={15} />Seguimiento ({items.length})</h3>
+      {items.length === 0 && <p className="muted">Aún no hay comentarios.</p>}
+      {items.map((item) => (
+        <div className={`comment-box ${item.internal ? 'internal' : ''}`} key={item.id}>
+          <div className="avatar small">{item.authorName.split(' ').map((word) => word[0]).join('').slice(0, 2)}</div>
+          <div><strong>{item.authorName}{item.staff ? ' · TI' : ''}</strong><small>{formatDateTime(item.createdAt)}{item.internal ? ' · nota interna' : ''}</small><p>{item.body}</p></div>
+        </div>
+      ))}
+      <label className="field-label">Nuevo comentario<Textarea rows={2} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} placeholder={staff ? 'Escribe una actualización para el solicitante o una nota interna' : 'Agrega información que ayude a resolver tu caso'} /></label>
+      <div className="row-actions comment-actions">
+        {staff && <label className="check-line"><input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} /><LockKeyhole size={13} />Nota interna (el solicitante no la ve)</label>}
+        <Button disabled={busy || body.trim().length === 0} onClick={() => void post()}>{busy ? 'Enviando…' : 'Comentar'}</Button>
+      </div>
+      {error && <div className="error-note">{error}</div>}
+    </div>
   )
 }
 

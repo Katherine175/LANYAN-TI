@@ -40,6 +40,20 @@ public class TicketController {
         return tickets.get(id, principal.getId(), manager);
     }
 
+    @GetMapping("/{id}/comments")
+    public java.util.List<CommentView> comments(@PathVariable UUID id, @AuthenticationPrincipal AccountPrincipal principal) {
+        return tickets.comments(id, principal.getId(), manager(principal));
+    }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<CommentView> comment(@PathVariable UUID id, @Valid @RequestBody CommentRequest body, @AuthenticationPrincipal AccountPrincipal principal) {
+        return ResponseEntity.status(201).body(tickets.comment(id, principal.getId(), manager(principal), body.body(), body.isInternal()));
+    }
+
+    private static boolean manager(AccountPrincipal principal) {
+        return principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("tickets:manage"));
+    }
+
     @PostMapping("/{id}/take")
     public TicketView take(@PathVariable UUID id, @AuthenticationPrincipal AccountPrincipal principal) {
         return tickets.take(id, principal.getId());
