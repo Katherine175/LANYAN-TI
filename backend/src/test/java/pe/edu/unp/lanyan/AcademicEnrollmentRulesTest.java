@@ -35,7 +35,7 @@ class AcademicEnrollmentRulesTest {
         profiles = mock(StudentProfileRepository.class);
         sections = mock(CourseSectionRepository.class);
         enrollments = mock(EnrollmentRepository.class);
-        service = new EnrollmentService(profiles, sections, enrollments);
+        service = new EnrollmentService(profiles, sections, enrollments, org.mockito.Mockito.mock(pe.edu.unp.lanyan.audit.application.AuditService.class));
         var role = mock(Role.class);
         when(role.getName()).thenReturn(RoleName.ROLE_STUDENT);
         var account = new UserAccount("Estudiante FICTICIO", "student@example.test", "NOT_A_REAL_HASH", Set.of(role));

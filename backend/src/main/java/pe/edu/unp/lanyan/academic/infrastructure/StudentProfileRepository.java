@@ -13,6 +13,8 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     @EntityGraph(attributePaths = "user")
     Optional<StudentProfile> findByUser_Id(UUID userId);
 
+    Optional<StudentProfile> findByStudentCode(String studentCode);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select profile from StudentProfile profile where profile.id = :id")
     Optional<StudentProfile> findForEnrollment(UUID id);

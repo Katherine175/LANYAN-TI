@@ -68,6 +68,7 @@ export type RouteKey =
   | 'dashboard'
   | 'catalogo'
   | 'cursos'
+  | 'mis-cursos'
   | 'tickets'
   | 'service-desk'
   | 'problemas'

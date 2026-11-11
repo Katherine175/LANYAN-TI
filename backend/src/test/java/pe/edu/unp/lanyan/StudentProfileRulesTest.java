@@ -50,7 +50,7 @@ class StudentProfileRulesTest {
         var account = account();
         var profile = new StudentProfile(account, "TEST-OWN", LocalDate.of(2026, 1, 15));
         when(repository.findByUser_Id(account.getId())).thenReturn(Optional.of(profile));
-        var view = new StudentProfileService(repository).getMyProfile(account.getId());
+        var view = new StudentProfileService(repository, org.mockito.Mockito.mock(pe.edu.unp.lanyan.identity.infrastructure.UserAccountRepository.class), org.mockito.Mockito.mock(pe.edu.unp.lanyan.audit.application.AuditService.class)).getMyProfile(account.getId());
         assertThat(view.userId()).isEqualTo(account.getId());
         assertThat(view.fullName()).isEqualTo(account.getFullName());
         assertThat(view.email()).isEqualTo(account.getEmail());
@@ -64,7 +64,7 @@ class StudentProfileRulesTest {
         var repository = mock(StudentProfileRepository.class);
         var id = UUID.randomUUID();
         when(repository.findByUser_Id(id)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> new StudentProfileService(repository).getMyProfile(id))
+        assertThatThrownBy(() -> new StudentProfileService(repository, org.mockito.Mockito.mock(pe.edu.unp.lanyan.identity.infrastructure.UserAccountRepository.class), org.mockito.Mockito.mock(pe.edu.unp.lanyan.audit.application.AuditService.class)).getMyProfile(id))
                 .isInstanceOf(StudentProfileNotFoundException.class);
         verify(repository).findByUser_Id(id);
         verifyNoMoreInteractions(repository);

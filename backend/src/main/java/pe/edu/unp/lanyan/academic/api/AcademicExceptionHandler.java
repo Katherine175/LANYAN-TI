@@ -9,7 +9,8 @@ import pe.edu.unp.lanyan.academic.application.StudentProfileNotFoundException;
 
 @Order(0)
 @RestControllerAdvice(assignableTypes = {StudentProfileController.class, StudentCoursesController.class,
-        AcademicAdminController.class, AcademicContentAdminController.class, StudentAcademicContentController.class})
+        AcademicAdminController.class, AcademicContentAdminController.class, StudentAcademicContentController.class,
+        StudentEnrollmentController.class, StudentProfileAdminController.class})
 public class AcademicExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail invalidAcademicData(IllegalArgumentException ex) {

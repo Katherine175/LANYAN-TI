@@ -291,3 +291,23 @@ Las horas de `academic_class_schedules` se guardan como hora local de Lima, sin
 conversión a UTC. Antes, una clase de 18:00 a 20:00 se guardaba como 23:00 a 01:00
 y la restricción `ck_schedule_times` la rechazaba; ninguna clase podía terminar
 después de las 19:00.
+
+## Automatrícula y perfil del estudiante (V10)
+
+Decisión del 2026-11-11: **el estudiante se matricula solo** desde el catálogo.
+
+- `PUT /api/v1/academic/students/{userId}/profile` (ADMIN + `academic:students:manage`)
+  crea o corrige el código de estudiante de una cuenta con rol Estudiante. El código
+  es único y se guarda en mayúsculas. `GET` en la misma ruta lo consulta (`404` si no
+  existe). En React se completa desde el formulario de usuarios.
+- `POST /api/v1/students/me/enrollments` con `{"sectionId": "…"}` (STUDENT +
+  `academic:enrollments:create:self` + CSRF) aplica las mismas reglas y bloqueos que
+  la matrícula administrativa: cuenta activa, curso activo, sección abierta, sin
+  duplicado y con cupo. Además, desde el catálogo no se permite una segunda sección
+  del mismo curso (`409 COURSE_ALREADY_ENROLLED`). Sin código de estudiante responde
+  `404 STUDENT_PROFILE_NOT_FOUND`.
+- Toda matrícula, del estudiante o de la administración, queda en auditoría como
+  `ENROLLMENT_CREATED` con el código, curso, sección, periodo y origen.
+
+La pantalla **Mis cursos** reúne los cursos matriculados con su horario y los
+materiales publicados (enlaces HTTPS). Anular una matrícula todavía no está disponible.

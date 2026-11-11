@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, ChevronLeft, ChevronRight, Pencil, Search, ShieldCheck, Trash2, TriangleAlert, Users, Wrench, GraduationCap } from 'lucide-react'
 import { Badge, Button, Card, Input, Modal, Select } from '../components/ui'
 import { ApiError } from '../services/api'
+import { getStudentProfile, saveStudentProfile } from '../services/academicService'
 import {
   backendRoleLabels, createAccount, deleteAccount, initials, INSTITUTIONAL_DOMAIN, isInstitutionalEmail, listAccounts, listAudit, listRoles, updateAccount,
   type Account, type AuditEvent, type BackendRole, type Page, type RoleSummary,
@@ -95,9 +96,19 @@ function AccountModal({ account, self = false, onClose, onSaved }: { account?: A
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const editing = account !== undefined
+  // Tras crear la cuenta, si el código de estudiante falla, el formulario sigue como edición de esa cuenta.
+  const [target, setTarget] = useState<Account | undefined>(account)
+  const [studentCode, setStudentCode] = useState('')
+  const [savedCode, setSavedCode] = useState('')
+  const editing = target !== undefined
+  const isStudent = form.roles.includes('ROLE_STUDENT')
   // Una cuenta antigua puede conservar su correo; uno nuevo debe ser institucional.
-  const emailChanged = form.email.trim().toLowerCase() !== account?.email
+  const emailChanged = form.email.trim().toLowerCase() !== target?.email
+
+  useEffect(() => {
+    if (!account?.roles.includes('ROLE_STUDENT')) return
+    getStudentProfile(account.id).then((profile) => { setStudentCode(profile.studentCode); setSavedCode(profile.studentCode) }).catch(() => undefined)
+  }, [account])
 
   const toggleRole = (role: BackendRole) => {
     const roles = form.roles.includes(role) ? form.roles.filter((item) => item !== role) : [...form.roles, role]
@@ -111,17 +122,31 @@ function AccountModal({ account, self = false, onClose, onSaved }: { account?: A
     if ((!editing || form.password) && form.password.length < 12) { setError('La contraseña debe tener al menos 12 caracteres.'); return }
     setSaving(true)
     setError('')
+    let saved: Account
     try {
-      const saved = account
-        ? await updateAccount(account.id, { fullName: form.fullName, email: form.email, active: form.active, roles: form.roles, ...(form.password ? { password: form.password } : {}) })
+      saved = target
+        ? await updateAccount(target.id, { fullName: form.fullName, email: form.email, active: form.active, roles: form.roles, ...(form.password ? { password: form.password } : {}) })
         : await createAccount({ fullName: form.fullName, email: form.email, password: form.password, roles: form.roles })
-      onSaved(saved)
-      onClose()
     } catch (e) {
       setError(formErrorText(e))
-    } finally {
       setSaving(false)
+      return
     }
+    const code = studentCode.trim().toUpperCase()
+    if (isStudent && code && code !== savedCode) {
+      try {
+        await saveStudentProfile(saved.id, code)
+      } catch (e) {
+        onSaved(saved)
+        setTarget(saved)
+        setForm({ ...form, password: '' })
+        setError(`La cuenta se guardó, pero no el código de estudiante: ${errorText(e)}`)
+        setSaving(false)
+        return
+      }
+    }
+    onSaved(saved)
+    onClose()
   }
 
   return (
@@ -143,6 +168,7 @@ function AccountModal({ account, self = false, onClose, onSaved }: { account?: A
             )
           })}
         </fieldset>
+        {isStudent && <label className="field-label">Código de estudiante<Input maxLength={32} value={studentCode} onChange={(e) => setStudentCode(e.target.value)} placeholder="Ej. 2026-0001" /><span className="field-hint">{savedCode ? 'Con este código el estudiante se matricula en el catálogo.' : 'Sin código, el estudiante puede ver el catálogo pero no matricularse.'}</span></label>}
         <div className="form-grid">
           <label className="field-label">{editing ? 'Nueva contraseña' : 'Contraseña inicial'}<Input required={!editing} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Déjala vacía para no cambiarla' : 'Mínimo 12 caracteres'} /></label>
           {editing && <label className="field-label">Estado<Select value={form.active ? 'activo' : 'inactivo'} disabled={self} onChange={(e) => setForm({ ...form, active: e.target.value === 'activo' })}><option value="activo">Activo</option><option value="inactivo">Inactivo: no puede ingresar</option></Select></label>}
@@ -222,6 +248,8 @@ const auditLabels: Record<string, { text: string; tone: 'lavender' | 'blue' | 'm
   USER_ROLES_CHANGED: { text: 'Roles modificados', tone: 'pink' },
   USER_UPDATED: { text: 'Cuenta editada', tone: 'pink' },
   USER_DELETED: { text: 'Cuenta eliminada', tone: 'danger' },
+  STUDENT_PROFILE_SAVED: { text: 'Código de estudiante', tone: 'lavender' },
+  ENROLLMENT_CREATED: { text: 'Matrícula', tone: 'mint' },
   CATALOG_CATEGORY_CREATED: { text: 'Categoría creada', tone: 'blue' },
   CATALOG_SERVICE_CREATED: { text: 'Servicio creado', tone: 'blue' },
   CATALOG_SERVICE_UPDATED: { text: 'Servicio modificado', tone: 'pink' },

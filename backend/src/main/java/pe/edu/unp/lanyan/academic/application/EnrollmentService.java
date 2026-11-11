@@ -10,6 +10,8 @@ import pe.edu.unp.lanyan.shared.api.PageView;
 import pe.edu.unp.lanyan.academic.api.AcademicDtos.*;
 import pe.edu.unp.lanyan.academic.domain.*;
 import pe.edu.unp.lanyan.academic.infrastructure.*;
+import pe.edu.unp.lanyan.audit.application.AuditService;
+import pe.edu.unp.lanyan.audit.domain.AuditAction;
 import pe.edu.unp.lanyan.identity.domain.RoleName;
 
 @Service
@@ -18,9 +20,11 @@ public class EnrollmentService {
     private final StudentProfileRepository profiles;
     private final CourseSectionRepository sections;
     private final EnrollmentRepository enrollments;
+    private final AuditService audit;
 
-    public EnrollmentService(StudentProfileRepository profiles, CourseSectionRepository sections, EnrollmentRepository enrollments) {
-        this.profiles = profiles; this.sections = sections; this.enrollments = enrollments;
+    public EnrollmentService(StudentProfileRepository profiles, CourseSectionRepository sections, EnrollmentRepository enrollments,
+            AuditService audit) {
+        this.profiles = profiles; this.sections = sections; this.enrollments = enrollments; this.audit = audit;
     }
 
     @Transactional
@@ -29,10 +33,23 @@ public class EnrollmentService {
         // Orden de bloqueo constante: primero el perfil, después la sección.
         var student = profiles.findForEnrollment(request.studentProfileId()).orElseThrow(() ->
                 new AcademicException(HttpStatus.NOT_FOUND, "STUDENT_PROFILE_NOT_FOUND", "Perfil estudiantil no encontrado."));
+        return enroll(student, request.sectionId(), false);
+    }
+
+    /** El estudiante se matricula desde el catálogo con las mismas reglas que la administración. */
+    @Transactional
+    @PreAuthorize("hasRole('STUDENT') and hasAuthority('portal:academic:access') and hasAuthority('academic:enrollments:create:self') and #userId == authentication.principal.id")
+    public EnrollmentView enrollSelf(UUID userId, UUID sectionId) {
+        var profileId = profiles.findByUser_Id(userId).orElseThrow(StudentProfileNotFoundException::new).getId();
+        var student = profiles.findForEnrollment(profileId).orElseThrow(StudentProfileNotFoundException::new);
+        return enroll(student, sectionId, true);
+    }
+
+    private EnrollmentView enroll(StudentProfile student, UUID sectionId, boolean selfService) {
         if (!student.getUser().isActive() || student.getUser().getRoles().stream().noneMatch(role -> role.getName() == RoleName.ROLE_STUDENT)) {
             throw new AcademicException(HttpStatus.CONFLICT, "STUDENT_NOT_ELIGIBLE", "La cuenta del estudiante debe estar activa y tener rol STUDENT.");
         }
-        var section = sections.findForEnrollment(request.sectionId()).orElseThrow(() ->
+        var section = sections.findForEnrollment(sectionId).orElseThrow(() ->
                 new AcademicException(HttpStatus.NOT_FOUND, "SECTION_NOT_FOUND", "Sección no encontrada."));
         if (section.getCourse().getStatus() != CourseStatus.ACTIVE) {
             throw new AcademicException(HttpStatus.CONFLICT, "COURSE_INACTIVE", "El curso no admite nuevas matrículas.");
@@ -43,10 +60,18 @@ public class EnrollmentService {
         if (enrollments.existsByStudent_IdAndSection_Id(student.getId(), section.getId())) {
             throw new AcademicException(HttpStatus.CONFLICT, "ENROLLMENT_EXISTS", "El estudiante ya tiene una matrícula en esa sección.");
         }
+        // Desde el catálogo no se ocupan dos cupos del mismo curso; la administración conserva esa posibilidad.
+        if (selfService && enrollments.existsByStudent_IdAndSection_Course_IdAndStatus(student.getId(), section.getCourse().getId(), EnrollmentStatus.ENROLLED)) {
+            throw new AcademicException(HttpStatus.CONFLICT, "COURSE_ALREADY_ENROLLED", "Ya estás matriculado en otra sección de este curso.");
+        }
         if (enrollments.countBySection_IdAndStatus(section.getId(), EnrollmentStatus.ENROLLED) >= section.getCapacity()) {
             throw new AcademicException(HttpStatus.CONFLICT, "SECTION_FULL", "La sección no tiene cupos disponibles.");
         }
-        return AcademicViews.enrollment(enrollments.saveAndFlush(new Enrollment(student, section)));
+        var enrollment = AcademicViews.enrollment(enrollments.saveAndFlush(new Enrollment(student, section)));
+        audit.record(AuditAction.ENROLLMENT_CREATED, "ENROLLMENT", enrollment.id().toString(),
+                "estudiante=" + student.getStudentCode() + "; curso=" + section.getCourse().getCode() + "; sección=" + section.getCode()
+                        + "; periodo=" + section.getAcademicPeriod() + "; origen=" + (selfService ? "catálogo" : "administración"));
+        return enrollment;
     }
 
     @PreAuthorize("hasRole('STUDENT') and hasAuthority('portal:academic:access') and hasAuthority('academic:enrollments:read:self') and #userId == authentication.principal.id")

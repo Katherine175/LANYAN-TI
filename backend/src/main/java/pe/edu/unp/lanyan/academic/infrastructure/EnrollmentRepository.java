@@ -11,6 +11,7 @@ import pe.edu.unp.lanyan.academic.domain.EnrollmentStatus;
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     boolean existsByStudent_IdAndSection_Id(UUID studentId, UUID sectionId);
     long countBySection_IdAndStatus(UUID sectionId, EnrollmentStatus status);
+    boolean existsByStudent_IdAndSection_Course_IdAndStatus(UUID studentId, UUID courseId, EnrollmentStatus status);
 
     /** Filas [sectionId, matrículas ENROLLED]; las secciones sin matrículas no aparecen. */
     @org.springframework.data.jpa.repository.Query("""

@@ -89,3 +89,51 @@ export const createSection = (courseId: string, body: { code: string; academicPe
 export const listSchedules = (sectionId: string) => api<Page<Schedule>>(`/academic/sections/${sectionId}/schedules?page=0&size=100`)
 export const createSchedule = (sectionId: string, body: { dayOfWeek: Weekday; startTime: string; endTime: string; modality: Modality; classroom?: string }) =>
   api<Schedule>(`/academic/sections/${sectionId}/schedules`, { method: 'POST', body })
+
+/* ---------- Portal del estudiante ---------- */
+
+export type MaterialType = 'DOCUMENT' | 'GUIDE' | 'LINK'
+
+export interface StudentCourse {
+  enrollmentId: string
+  enrollmentStatus: 'ENROLLED' | 'CANCELLED' | 'COMPLETED'
+  enrolledAt: string
+  course: Course
+  section: Section
+}
+
+export interface SectionSchedule extends Schedule {
+  section: Section
+}
+
+export interface Material {
+  id: string
+  section: Section
+  title: string
+  description: string | null
+  type: MaterialType
+  referenceType: 'LOCAL_REFERENCE' | 'HTTPS_URL'
+  reference: string
+  status: 'DRAFT' | 'PUBLISHED'
+}
+
+export interface StudentProfile {
+  id: string
+  userId: string
+  studentCode: string
+}
+
+export const materialTypeLabels: Record<MaterialType, string> = { DOCUMENT: 'Documento', GUIDE: 'Guía', LINK: 'Enlace' }
+
+export const myCourses = () => api<Page<StudentCourse>>('/students/me/courses?page=0&size=100')
+export const mySchedule = () => api<Page<SectionSchedule>>('/students/me/schedule?page=0&size=100')
+export const myMaterials = () => api<Page<Material>>('/students/me/materials?page=0&size=100')
+export const enrollInSection = (sectionId: string) => api<unknown>('/students/me/enrollments', { method: 'POST', body: { sectionId } })
+
+export const getStudentProfile = (userId: string) => api<StudentProfile>(`/academic/students/${userId}/profile`)
+export const saveStudentProfile = (userId: string, studentCode: string) =>
+  api<StudentProfile>(`/academic/students/${userId}/profile`, { method: 'PUT', body: { studentCode } })
+
+export const listMaterials = (sectionId: string) => api<Page<Material>>(`/academic/sections/${sectionId}/materials?page=0&size=100`)
+export const createMaterial = (sectionId: string, body: { title: string; description?: string; type: MaterialType; referenceType: 'HTTPS_URL'; reference: string; status: 'PUBLISHED' }) =>
+  api<Material>(`/academic/sections/${sectionId}/materials`, { method: 'POST', body })

@@ -12,7 +12,7 @@ import type { Priority, Role, RouteKey, Ticket, TicketStatus, WorkflowRequest } 
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
 import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
-import { CourseCatalog, CoursesPanel } from './pages/courses'
+import { CourseCatalog, CoursesPanel, MyCourses } from './pages/courses'
 import { SESSION_EXPIRED_EVENT } from './services/api'
 import { listPublishedServices } from './services/catalogService'
 import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, type Account } from './services/identityService'
@@ -20,7 +20,8 @@ import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, typ
 const navItems: { id: RouteKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
   { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
   { id: 'catalogo', label: 'Catálogo TI', icon: Sparkles, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
-  { id: 'cursos', label: 'Cursos', icon: GraduationCap, roles: ['estudiante', 'administrador'] },
+  { id: 'mis-cursos', label: 'Mis cursos', icon: BookOpen, roles: ['estudiante'] },
+  { id: 'cursos', label: 'Catálogo de cursos', icon: GraduationCap, roles: ['estudiante', 'administrador'] },
   { id: 'tickets', label: 'Tickets', icon: TicketCheck, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
   { id: 'service-desk', label: 'Service Desk', icon: Headphones, roles: ['tecnico', 'administrador'] },
   { id: 'problemas', label: 'Problemas', icon: CircleAlert, roles: ['tecnico', 'administrador'] },
@@ -107,7 +108,8 @@ function App() {
         <main className="page-wrap">
           {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
           {view === 'catalogo' && <Catalog canOperate={role === 'tecnico' || role === 'administrador'} notify={notify} onNavigate={navigate} />}
-          {view === 'cursos' && <CourseCatalog isAdmin={role === 'administrador'} />}
+          {view === 'cursos' && <CourseCatalog isAdmin={role === 'administrador'} notify={notify} onOpenMyCourses={() => navigate('mis-cursos')} />}
+          {view === 'mis-cursos' && <MyCourses onOpenCatalog={() => navigate('cursos')} />}
           {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}

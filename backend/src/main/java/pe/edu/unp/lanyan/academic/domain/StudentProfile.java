@@ -46,16 +46,24 @@ public class StudentProfile {
 
     public StudentProfile(UserAccount user, String studentCode, LocalDate admissionDate) {
         this.user = Objects.requireNonNull(user, "El perfil requiere una cuenta existente.");
-        if (studentCode == null || studentCode.isBlank()) {
-            throw new IllegalArgumentException("El código estudiantil es obligatorio.");
-        }
-        var normalized = studentCode.trim().toUpperCase(Locale.ROOT);
-        if (normalized.length() > 32) throw new IllegalArgumentException("El código estudiantil admite hasta 32 caracteres.");
         this.id = UUID.randomUUID();
-        this.studentCode = normalized;
+        this.studentCode = normalizeCode(studentCode);
         this.admissionDate = admissionDate;
         this.createdAt = Instant.now();
         this.updatedAt = createdAt;
+    }
+
+    public static String normalizeCode(String studentCode) {
+        if (studentCode == null || studentCode.isBlank()) throw new IllegalArgumentException("El código estudiantil es obligatorio.");
+        var normalized = studentCode.trim().toUpperCase(Locale.ROOT);
+        if (normalized.length() > 32) throw new IllegalArgumentException("El código estudiantil admite hasta 32 caracteres.");
+        return normalized;
+    }
+
+    public void revise(String studentCode, LocalDate admissionDate) {
+        this.studentCode = normalizeCode(studentCode);
+        this.admissionDate = admissionDate;
+        this.updatedAt = Instant.now();
     }
 
     public UUID getId() { return id; }
