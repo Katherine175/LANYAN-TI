@@ -5,27 +5,29 @@ import {
   Headphones, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, LogOut, Menu,
   MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings2,
   SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck, Users,
-  Wrench, X, Zap, type LucideIcon,
+  Wrench, X, Zap, GraduationCap, type LucideIcon,
 } from 'lucide-react'
 import { articles, monthlyData, problems, requests, services, tickets as initialTickets } from './data/mockData'
 import type { Priority, Role, RouteKey, Ticket, TicketStatus, WorkflowRequest } from './types'
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
 import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
+import { CourseCatalog, CoursesPanel } from './pages/courses'
 import { SESSION_EXPIRED_EVENT } from './services/api'
 import { listPublishedServices } from './services/catalogService'
 import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, type Account } from './services/identityService'
 
 const navItems: { id: RouteKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
-  { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, roles: ['usuario', 'tecnico', 'administrador'] },
-  { id: 'catalogo', label: 'Catálogo TI', icon: Sparkles, roles: ['usuario', 'tecnico', 'administrador'] },
-  { id: 'tickets', label: 'Tickets', icon: TicketCheck, roles: ['usuario', 'tecnico', 'administrador'] },
+  { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
+  { id: 'catalogo', label: 'Catálogo TI', icon: Sparkles, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
+  { id: 'cursos', label: 'Cursos', icon: GraduationCap, roles: ['estudiante', 'administrador'] },
+  { id: 'tickets', label: 'Tickets', icon: TicketCheck, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
   { id: 'service-desk', label: 'Service Desk', icon: Headphones, roles: ['tecnico', 'administrador'] },
   { id: 'problemas', label: 'Problemas', icon: CircleAlert, roles: ['tecnico', 'administrador'] },
-  { id: 'accesos', label: 'Accesos', icon: KeyRound, roles: ['usuario', 'tecnico', 'administrador'] },
-  { id: 'solicitudes', label: 'Solicitudes', icon: ClipboardCheck, roles: ['usuario', 'tecnico', 'administrador'] },
+  { id: 'accesos', label: 'Accesos', icon: KeyRound, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
+  { id: 'solicitudes', label: 'Solicitudes', icon: ClipboardCheck, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
   { id: 'operaciones', label: 'Operaciones TI', icon: Activity, roles: ['tecnico', 'administrador'] },
-  { id: 'conocimiento', label: 'Conocimiento', icon: BookOpen, roles: ['usuario', 'tecnico', 'administrador'] },
+  { id: 'conocimiento', label: 'Conocimiento', icon: BookOpen, roles: ['usuario', 'estudiante', 'tecnico', 'administrador'] },
   { id: 'reportes', label: 'Reportes', icon: BarChart3, roles: ['tecnico', 'administrador'] },
   { id: 'mejora', label: 'Mejora continua', icon: TrendingUp, roles: ['tecnico', 'administrador'] },
   { id: 'administracion', label: 'Administración', icon: Settings2, roles: ['administrador'] },
@@ -104,7 +106,8 @@ function App() {
         <Header account={account} onMenu={() => setMobileMenu(true)} />
         <main className="page-wrap">
           {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
-          {view === 'catalogo' && <Catalog canOperate={role !== 'usuario'} notify={notify} onNavigate={navigate} />}
+          {view === 'catalogo' && <Catalog canOperate={role === 'tecnico' || role === 'administrador'} notify={notify} onNavigate={navigate} />}
+          {view === 'cursos' && <CourseCatalog isAdmin={role === 'administrador'} />}
           {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}
@@ -258,6 +261,7 @@ function Dashboard({ account, onNavigate, tickets }: { account: Account; onNavig
 }
 
 function TicketsPage({ role, tickets, setTickets, notify }: { role: Role; tickets: Ticket[]; setTickets: (tickets: Ticket[]) => void; notify: (message: string) => void }) {
+  const selfService = role === 'usuario' || role === 'estudiante'
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('Todos')
   const [createOpen, setCreateOpen] = useState(false)
@@ -279,7 +283,7 @@ function TicketsPage({ role, tickets, setTickets, notify }: { role: Role; ticket
   }
   return (
     <>
-      <PageHeader eyebrow="Gestión de atención" title={role === 'usuario' ? 'Mis tickets' : 'Tickets'} description={role === 'usuario' ? 'Consulta y da seguimiento a tus solicitudes.' : 'Gestiona incidentes y solicitudes desde un solo lugar.'} action={<Button onClick={() => setCreateOpen(true)}><Plus size={17} />Registrar ticket</Button>} />
+      <PageHeader eyebrow="Gestión de atención" title={selfService ? 'Mis tickets' : 'Tickets'} description={selfService ? 'Consulta y da seguimiento a tus solicitudes.' : 'Gestiona incidentes y solicitudes desde un solo lugar.'} action={<Button onClick={() => setCreateOpen(true)}><Plus size={17} />Registrar ticket</Button>} />
       <Card className="toolbar"><div className="table-search"><Search size={17} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por ID o asunto" /></div><div className="toolbar-right"><Select value={status} onChange={(e) => setStatus(e.target.value)}><option>Todos</option><option>Nuevo</option><option>En progreso</option><option>En espera</option><option>Resuelto</option></Select><Button variant="secondary"><SlidersHorizontal size={16} />Más filtros</Button></div></Card>
       <Card className="table-card"><div className="result-count"><strong>{filtered.length} tickets</strong><span>Actualizado hace unos segundos</span></div><TicketTable tickets={filtered} onSelect={setSelected} /></Card>
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Registrar nuevo ticket" footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button onClick={createTicket}>Registrar ticket</Button></>}>
@@ -422,12 +426,14 @@ function Administration({ currentId, notify }: { currentId: string; notify: (mes
   const [tab, setTab] = useState('Usuarios')
   const [creating, setCreating] = useState(false)
   const [creatingService, setCreatingService] = useState(false)
+  const [creatingCourse, setCreatingCourse] = useState(false)
   return (
     <>
-      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : tab === 'Servicios' ? <Button onClick={() => setCreatingService(true)}><Plus size={17} />Añadir servicio</Button> : undefined} />
-      <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Auditoría', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
+      <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : tab === 'Servicios' ? <Button onClick={() => setCreatingService(true)}><Plus size={17} />Añadir servicio</Button> : tab === 'Cursos' ? <Button onClick={() => setCreatingCourse(true)}><Plus size={17} />Añadir curso</Button> : undefined} />
+      <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Cursos', 'Auditoría', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
       {tab === 'Usuarios' && <UsersPanel currentId={currentId} creating={creating} onCloseCreate={() => setCreating(false)} notify={notify} />}
       {tab === 'Roles y permisos' && <RolesPanel />}
+      {tab === 'Cursos' && <CoursesPanel creating={creatingCourse} onCloseCreate={() => setCreatingCourse(false)} notify={notify} />}
       {tab === 'Auditoría' && <AuditPanel />}
       {tab === 'Servicios' && <ServicesPanel creating={creatingService} onCloseCreate={() => setCreatingService(false)} notify={notify} />}
       {tab === 'Configuración SLA' && <div className="sla-config">{[['Incidente crítico', '15 min', '2 horas'], ['Prioridad alta', '30 min', '4 horas'], ['Prioridad media', '2 horas', '8 horas'], ['Prioridad baja', '4 horas', '24 horas']].map((item, index) => <Card key={item[0]}><div><Badge tone={['danger', 'pink', 'blue', 'neutral'][index] as 'danger'}>{item[0]}</Badge><h3>{item[0]}</h3></div><label className="field-label">Primera respuesta<Input defaultValue={item[1]} /></label><label className="field-label">Resolución objetivo<Input defaultValue={item[2]} /></label><Button variant="secondary" onClick={() => notify('SLA actualizado')}>Guardar</Button></Card>)}</div>}

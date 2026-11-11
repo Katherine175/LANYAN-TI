@@ -1,4 +1,4 @@
-export type Role = 'usuario' | 'tecnico' | 'administrador'
+export type Role = 'usuario' | 'estudiante' | 'tecnico' | 'administrador'
 
 export type Priority = 'Crítica' | 'Alta' | 'Media' | 'Baja'
 export type TicketStatus = 'Nuevo' | 'En progreso' | 'En espera' | 'Resuelto'
@@ -67,6 +67,7 @@ export interface User {
 export type RouteKey =
   | 'dashboard'
   | 'catalogo'
+  | 'cursos'
   | 'tickets'
   | 'service-desk'
   | 'problemas'

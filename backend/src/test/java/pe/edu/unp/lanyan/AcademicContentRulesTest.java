@@ -99,7 +99,8 @@ class AcademicContentRulesTest {
 
     @Test
     void overlapsAndDuplicatesAreRejectedWithoutSaving() {
-        when(schedules.overlaps(eq(section.getId()),anyInt(),any(),any(),any())).thenReturn(true);
+        var existing=new ClassSchedule(section,schedule().dayOfWeek(),schedule().startTime(),schedule().endTime(),schedule().modality(),schedule().classroom());
+        when(schedules.findActiveBySectionIds(java.util.List.of(section.getId()))).thenReturn(java.util.List.of(existing));
         assertThat(catchThrowableOfType(()->scheduleService.create(section.getId(),schedule()),AcademicException.class).code()).isEqualTo("SCHEDULE_OVERLAP");
         verify(schedules,never()).saveAndFlush(any());
         when(materials.duplicate(eq(section.getId()),any(),anyString(),any())).thenReturn(true);

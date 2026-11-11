@@ -271,3 +271,23 @@ Reportes: `target/surefire-reports/`. Registros: `target/phase22-verify.log` y
 `target/phase22-development.log`. PostgreSQL permanece activo; Java de verificación
 se detiene al terminar. Registra tus datos reales mediante las API documentadas
 para que cada estudiante vea sus cursos al iniciar sesión.
+
+## Catálogo de cursos (V9)
+
+`GET /api/v1/courses/catalog` devuelve la oferta vigente para `ROLE_STUDENT` y
+`ROLE_ADMIN` con el permiso `academic:catalog:read`: cursos `ACTIVE`, cada uno con
+sus secciones `OPEN`, los cupos libres (cupo menos matrículas `ENROLLED`) y sus
+horarios vigentes, ordenados por día y hora. Un curso activo sin secciones abiertas
+aparece con la lista vacía. Es de solo lectura y no expone estudiantes ni matrículas.
+Un estudiante sin perfil académico también puede consultarlo. USER y TECHNICIAN
+reciben `403`; sin sesión, `401`.
+
+La pantalla de React tiene dos partes: **Cursos** para el estudiante (catálogo con
+buscador y filtro por idioma) y **Administración › Cursos** para crear cursos,
+secciones y horarios con los endpoints de Fase 2.2 y 2.3. Matricularse desde el
+catálogo queda pendiente de decidir quién realiza la matrícula.
+
+Las horas de `academic_class_schedules` se guardan como hora local de Lima, sin
+conversión a UTC. Antes, una clase de 18:00 a 20:00 se guardaba como 23:00 a 01:00
+y la restricción `ck_schedule_times` la rechazaba; ninguna clase podía terminar
+después de las 19:00.

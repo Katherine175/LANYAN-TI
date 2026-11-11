@@ -73,9 +73,12 @@ public class ClassScheduleService {
         return AcademicPages.request(page,size,"createdAt")
                 .withSort(Sort.by("dayOfWeekNumber","startTime","id"));
     }
+    // Se compara en Java: la sección ya está bloqueada y así las horas no pasan por conversiones de zona horaria.
     private void checkOverlap(ClassSchedule s) {
-        if (schedules.overlaps(s.getSection().getId(), s.getDayOfWeek().getValue(), s.getStartTime(), s.getEndTime(), s.getId()))
-            throw new AcademicException(HttpStatus.CONFLICT, "SCHEDULE_OVERLAP", "Existe otro horario que se cruza en esta seccion.");
+        boolean clash = schedules.findActiveBySectionIds(java.util.List.of(s.getSection().getId())).stream()
+                .anyMatch(other -> !other.getId().equals(s.getId()) && other.getDayOfWeek() == s.getDayOfWeek()
+                        && other.getStartTime().isBefore(s.getEndTime()) && other.getEndTime().isAfter(s.getStartTime()));
+        if (clash) throw new AcademicException(HttpStatus.CONFLICT, "SCHEDULE_OVERLAP", "Existe otro horario que se cruza en esta seccion.");
     }
     private CourseSection lockSection(UUID id) {
         return sections.findForAcademicContent(id).orElseThrow(ClassScheduleService::sectionNotFound);

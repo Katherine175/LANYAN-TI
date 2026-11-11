@@ -301,3 +301,25 @@ td:first-child strong, td:first-child span { display: block; } td:first-child st
 .role-picker input:disabled { cursor: not-allowed; }
 .email-warning { display: flex; align-items: center; gap: .3rem; margin-top: .2rem; color: #a3364a; font-size: .66rem; font-weight: 600; }
 @media (max-width: 640px) { .role-picker { grid-template-columns: 1fr; } }
+
+/* Catálogo de cursos */
+.course-grid { grid-template-columns: repeat(3, 1fr); }
+.course-card .course-language { margin-top: 1rem; color: var(--lavender-strong); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.course-card h3 { margin-top: .25rem; }
+.course-card p { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.course-description { color: var(--ink-2); font-size: .85rem; line-height: 1.55; }
+.course-subtitle { margin-top: .3rem; font-size: .9rem; }
+.section-box { display: flex; flex-direction: column; gap: .6rem; padding: .9rem; border: 1px solid var(--border); border-radius: .85rem; }
+.section-box-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; }
+.section-box-head > div { display: flex; flex-direction: column; gap: .2rem; }
+.section-box-head span { color: var(--ink-3); font-size: .72rem; }
+.section-box > .btn-ghost { align-self: flex-start; }
+.schedule-list { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.schedule-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; padding: .5rem .65rem; color: var(--ink-2); font-size: .78rem; background: #f7f6fb; border-radius: .6rem; }
+.schedule-list li > svg { color: var(--lavender-strong); }
+.schedule-list strong { min-width: 4.6rem; color: var(--ink); }
+.schedule-place { display: inline-flex; align-items: center; gap: .25rem; margin-left: auto; color: var(--ink-3); }
+.inline-form { display: flex; flex-direction: column; gap: .8rem; padding: .9rem; background: #f7f6fb; border-radius: .85rem; }
+.inline-form .row-actions { justify-content: flex-end; }
+@media (max-width: 1100px) { .course-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .course-grid { grid-template-columns: 1fr; } .schedule-place { margin-left: 0; } }

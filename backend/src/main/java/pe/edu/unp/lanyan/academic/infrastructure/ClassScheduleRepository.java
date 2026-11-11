@@ -1,6 +1,5 @@
 package pe.edu.unp.lanyan.academic.infrastructure;
 
-import java.time.LocalTime;
 import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
@@ -12,15 +11,11 @@ public interface ClassScheduleRepository extends JpaRepository<ClassSchedule, UU
     @EntityGraph(attributePaths = {"section", "section.course"})
     Page<ClassSchedule> findBySection_IdAndDeletedAtIsNull(UUID sectionId, Pageable pageable);
 
+    @Query("select s from ClassSchedule s where s.deletedAt is null and s.section.id in :sectionIds")
+    java.util.List<ClassSchedule> findActiveBySectionIds(java.util.Collection<UUID> sectionIds);
+
     @Query("select s.section.id from ClassSchedule s where s.id=:id and s.deletedAt is null")
     Optional<UUID> findActiveSectionId(UUID id);
-
-    @Query("""
-        select (count(s) > 0) from ClassSchedule s where s.section.id=:sectionId
-        and s.deletedAt is null and s.dayOfWeekNumber=:day and s.startTime < :endTime
-        and s.endTime > :startTime and s.id <> :excludedId
-        """)
-    boolean overlaps(UUID sectionId, int day, LocalTime startTime, LocalTime endTime, UUID excludedId);
 
     @EntityGraph(attributePaths = {"section", "section.course"})
     @Query("""

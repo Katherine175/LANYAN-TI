@@ -14,6 +14,10 @@ public interface CourseSectionRepository extends JpaRepository<CourseSection, UU
     @EntityGraph(attributePaths = "course")
     Page<CourseSection> findByCourse_Id(UUID courseId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "course")
+    java.util.List<CourseSection> findByCourse_StatusAndStatus(pe.edu.unp.lanyan.academic.domain.CourseStatus courseStatus,
+            pe.edu.unp.lanyan.academic.domain.SectionStatus status);
+
     @Override
     @EntityGraph(attributePaths = "course")
     Optional<CourseSection> findById(UUID id);

@@ -56,7 +56,7 @@ class BackendPreparationTest {
 
     @Test
     void allMigrationsAreAppliedAndValidatedOnPostgreSql() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success = true",

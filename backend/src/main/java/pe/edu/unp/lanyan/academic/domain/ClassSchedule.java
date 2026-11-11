@@ -1,6 +1,8 @@
 package pe.edu.unp.lanyan.academic.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.type.descriptor.jdbc.LocalTimeJdbcType;
 import java.time.*;
 import java.util.*;
 
@@ -11,7 +13,11 @@ public class ClassSchedule {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "section_id", nullable = false) private CourseSection section;
     @Column(name = "day_of_week", nullable = false) private int dayOfWeekNumber;
+    // Hora local de Lima tal cual: sin esto Hibernate la convierte a UTC y una clase de 18:00 a 20:00
+    // se guarda como 23:00 a 01:00, que la base rechaza por terminar antes de empezar.
+    @JdbcType(LocalTimeJdbcType.class)
     @Column(name = "start_time", nullable = false) private LocalTime startTime;
+    @JdbcType(LocalTimeJdbcType.class)
     @Column(name = "end_time", nullable = false) private LocalTime endTime;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 32) private ClassModality modality;
     @Column(length = 120) private String classroom;

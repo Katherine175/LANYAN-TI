@@ -47,6 +47,7 @@ export const backendRoleLabels: Record<BackendRole, string> = {
 export function portalRole(account: Account): Role {
   if (account.roles.includes('ROLE_ADMIN')) return 'administrador'
   if (account.roles.includes('ROLE_TECHNICIAN')) return 'tecnico'
+  if (account.roles.includes('ROLE_STUDENT')) return 'estudiante'
   return 'usuario'
 }
 

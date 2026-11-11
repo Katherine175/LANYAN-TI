@@ -6,4 +6,5 @@ import pe.edu.unp.lanyan.academic.domain.Course;
 
 public interface CourseRepository extends JpaRepository<Course, UUID> {
     boolean existsByCode(String code);
+    java.util.List<Course> findByStatus(pe.edu.unp.lanyan.academic.domain.CourseStatus status, org.springframework.data.domain.Sort sort);
 }
