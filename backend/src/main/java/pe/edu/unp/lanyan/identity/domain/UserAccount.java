@@ -65,4 +65,16 @@ public class UserAccount {
         this.roles.addAll(roles);
         this.updatedAt = Instant.now();
     }
+
+    public void update(String fullName, String email, boolean active, Set<Role> roles) {
+        this.fullName = fullName.trim();
+        this.email = normalizeEmail(email);
+        this.active = active;
+        replaceRoles(roles);
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.updatedAt = Instant.now();
+    }
 }

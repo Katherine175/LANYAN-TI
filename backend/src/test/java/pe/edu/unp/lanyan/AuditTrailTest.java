@@ -37,8 +37,8 @@ import pe.edu.unp.lanyan.identity.infrastructure.UserAccountRepository;
         properties = "lanyan.auth.login-limit=500")
 class AuditTrailTest {
     static final String PASSWORD = "Fictitious-Test-Password42!";
-    static final String ADMIN = "admin-audit@example.test";
-    static final String STUDENT = "student-audit@example.test";
+    static final String ADMIN = "admin-audit@unp.edu.pe";
+    static final String STUDENT = "student-audit@unp.edu.pe";
 
     @Container
     static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
@@ -96,7 +96,7 @@ class AuditTrailTest {
     void userCreationAndRoleChangesRecordTheAdministrator() throws Exception {
         try (var client = new Client()) {
             client.login(ADMIN, PASSWORD);
-            var created = client.send("POST", "/api/v1/users", "{\"fullName\":\"Cuenta FICTICIA\",\"email\":\"audited@example.test\",\"password\":\""
+            var created = client.send("POST", "/api/v1/users", "{\"fullName\":\"Cuenta FICTICIA\",\"email\":\"audited@unp.edu.pe\",\"password\":\""
                     + PASSWORD + "\",\"roles\":[\"ROLE_USER\"]}");
             assertThat(created.statusCode()).isEqualTo(201);
             String id = JsonPath.read(created.body(), "$.id");

@@ -114,7 +114,7 @@ function App() {
           {view === 'conocimiento' && <Knowledge notify={notify} />}
           {view === 'reportes' && <Reports notify={notify} />}
           {view === 'mejora' && <Improvement notify={notify} />}
-          {view === 'administracion' && <Administration notify={notify} />}
+          {view === 'administracion' && <Administration currentId={account.id} notify={notify} />}
         </main>
       </div>
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
@@ -418,7 +418,7 @@ function Improvement({ notify }: { notify: (message: string) => void }) {
   )
 }
 
-function Administration({ notify }: { notify: (message: string) => void }) {
+function Administration({ currentId, notify }: { currentId: string; notify: (message: string) => void }) {
   const [tab, setTab] = useState('Usuarios')
   const [creating, setCreating] = useState(false)
   const [creatingService, setCreatingService] = useState(false)
@@ -426,7 +426,7 @@ function Administration({ notify }: { notify: (message: string) => void }) {
     <>
       <PageHeader eyebrow="Configuración del sistema" title="Administración" description="Gestiona personas, permisos, servicios y acuerdos de nivel." action={tab === 'Usuarios' ? <Button onClick={() => setCreating(true)}><Plus size={17} />Añadir usuario</Button> : tab === 'Servicios' ? <Button onClick={() => setCreatingService(true)}><Plus size={17} />Añadir servicio</Button> : undefined} />
       <div className="admin-tabs">{['Usuarios', 'Roles y permisos', 'Auditoría', 'Servicios', 'Configuración SLA'].map((item) => <Button key={item} variant={tab === item ? 'primary' : 'secondary'} onClick={() => setTab(item)}>{item}</Button>)}</div>
-      {tab === 'Usuarios' && <UsersPanel creating={creating} onCloseCreate={() => setCreating(false)} notify={notify} />}
+      {tab === 'Usuarios' && <UsersPanel currentId={currentId} creating={creating} onCloseCreate={() => setCreating(false)} notify={notify} />}
       {tab === 'Roles y permisos' && <RolesPanel />}
       {tab === 'Auditoría' && <AuditPanel />}
       {tab === 'Servicios' && <ServicesPanel creating={creatingService} onCloseCreate={() => setCreatingService(false)} notify={notify} />}

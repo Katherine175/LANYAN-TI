@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Check, ChevronLeft, ChevronRight, Search, ShieldCheck, Users, Wrench, GraduationCap } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Pencil, Search, ShieldCheck, Trash2, TriangleAlert, Users, Wrench, GraduationCap } from 'lucide-react'
 import { Badge, Button, Card, Input, Modal, Select } from '../components/ui'
 import { ApiError } from '../services/api'
 import {
-  backendRoleLabels, createAccount, initials, listAccounts, listAudit, listRoles,
+  backendRoleLabels, createAccount, deleteAccount, initials, INSTITUTIONAL_DOMAIN, isInstitutionalEmail, listAccounts, listAudit, listRoles, updateAccount,
   type Account, type AuditEvent, type BackendRole, type Page, type RoleSummary,
 } from '../services/identityService'
 
@@ -13,11 +13,27 @@ const roleTone: Record<BackendRole, 'lavender' | 'blue' | 'neutral' | 'mint'> = 
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : 'No se pudo completar la operación.')
 
-export function UsersPanel({ creating, onCloseCreate, notify }: { creating: boolean; onCloseCreate: () => void; notify: (message: string) => void }) {
+const roleOrder: BackendRole[] = ['ROLE_ADMIN', 'ROLE_TECHNICIAN', 'ROLE_USER', 'ROLE_STUDENT']
+
+// El servidor ya explica cada rechazo (correo fuera de dominio, repetido, contraseña corta).
+const formErrorText = (error: unknown) => {
+  if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
+    const fields = Object.keys(error.fields)
+    if (fields.includes('email')) return 'Revisa el correo: debe tener un formato válido.'
+    if (fields.includes('fullName')) return 'Escribe el nombre completo.'
+    if (fields.includes('roles')) return 'Selecciona al menos un rol.'
+    return 'Revisa los datos del formulario.'
+  }
+  return errorText(error)
+}
+
+export function UsersPanel({ currentId, creating, onCloseCreate, notify }: { currentId: string; creating: boolean; onCloseCreate: () => void; notify: (message: string) => void }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<Account | null>(null)
+  const [removing, setRemoving] = useState<Account | null>(null)
 
   const load = () => listAccounts().then((page) => { setAccounts(page.content); setError('') }).catch((e) => setError(errorText(e))).finally(() => setLoading(false))
   useEffect(() => { void load() }, [])
@@ -37,63 +53,129 @@ export function UsersPanel({ creating, onCloseCreate, notify }: { creating: bool
         {error && <div className="error-note">{error}</div>}
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
-              {visible.map((account) => (
-                <tr key={account.id}>
-                  <td><div className="person-cell"><div className="avatar">{initials(account.fullName)}</div><strong>{account.fullName}</strong></div></td>
-                  <td>{account.email}</td>
-                  <td><div className="badge-row">{account.roles.map((role) => <Badge key={role} tone={roleTone[role]}>{backendRoleLabels[role]}</Badge>)}</div></td>
-                  <td><Badge tone={account.active ? 'mint' : 'neutral'}>{account.active ? 'Activo' : 'Inactivo'}</Badge></td>
-                </tr>
-              ))}
+              {visible.map((account) => {
+                const self = account.id === currentId
+                return (
+                  <tr key={account.id}>
+                    <td><div className="person-cell"><div className="avatar">{initials(account.fullName)}</div><strong>{account.fullName}</strong>{self && <Badge tone="lavender">Tú</Badge>}</div></td>
+                    <td>{account.email}{!isInstitutionalEmail(account.email) && <span className="email-warning"><TriangleAlert size={13} />Correo no institucional</span>}</td>
+                    <td><div className="badge-row">{account.roles.map((role) => <Badge key={role} tone={roleTone[role]}>{backendRoleLabels[role]}</Badge>)}</div></td>
+                    <td><Badge tone={account.active ? 'mint' : 'neutral'}>{account.active ? 'Activo' : 'Inactivo'}</Badge></td>
+                    <td>
+                      <div className="row-actions">
+                        <Button variant="ghost" className="icon-btn" aria-label={`Editar a ${account.fullName}`} title="Editar" onClick={() => setEditing(account)}><Pencil size={16} /></Button>
+                        {!self && <Button variant="ghost" className="icon-btn" aria-label={`Eliminar a ${account.fullName}`} title="Eliminar" onClick={() => setRemoving(account)}><Trash2 size={16} /></Button>}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
           {!loading && visible.length === 0 && <div className="empty-state"><Search size={24} /><strong>Sin resultados</strong><span>No hay cuentas que coincidan.</span></div>}
         </div>
       </Card>
-      <CreateAccountModal open={creating} onClose={onCloseCreate} onCreated={(account) => { notify(`Cuenta de ${account.fullName} creada`); void load() }} />
+      {creating && <AccountModal onClose={onCloseCreate} onSaved={(account) => { notify(`Cuenta de ${account.fullName} creada`); void load() }} />}
+      {editing && <AccountModal account={editing} self={editing.id === currentId} onClose={() => setEditing(null)} onSaved={(account) => { notify(`Cuenta de ${account.fullName} actualizada`); void load() }} />}
+      {removing && <DeleteAccountModal account={removing} onClose={() => setRemoving(null)} onDeleted={() => { notify(`Cuenta de ${removing.fullName} eliminada`); void load() }} />}
     </>
   )
 }
 
-function CreateAccountModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (account: Account) => void }) {
-  const empty = { fullName: '', email: '', password: '', role: 'ROLE_USER' as BackendRole }
-  const [form, setForm] = useState(empty)
+/** Sin `account` crea una cuenta nueva; con `account` la edita. */
+function AccountModal({ account, self = false, onClose, onSaved }: { account?: Account; self?: boolean; onClose: () => void; onSaved: (account: Account) => void }) {
+  const [form, setForm] = useState({
+    fullName: account?.fullName ?? '',
+    email: account?.email ?? '',
+    password: '',
+    active: account?.active ?? true,
+    roles: account?.roles ?? (['ROLE_USER'] as BackendRole[]),
+  })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const editing = account !== undefined
+  // Una cuenta antigua puede conservar su correo; uno nuevo debe ser institucional.
+  const emailChanged = form.email.trim().toLowerCase() !== account?.email
 
-  const close = () => { setForm(empty); setError(''); onClose() }
+  const toggleRole = (role: BackendRole) => {
+    const roles = form.roles.includes(role) ? form.roles.filter((item) => item !== role) : [...form.roles, role]
+    setForm({ ...form, roles })
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (form.password.length < 12) { setError('La contraseña debe tener al menos 12 caracteres.'); return }
+    if (emailChanged && !isInstitutionalEmail(form.email)) { setError(`Usa un correo institucional que termine en @${INSTITUTIONAL_DOMAIN}.`); return }
+    if (form.roles.length === 0) { setError('Selecciona al menos un rol.'); return }
+    if ((!editing || form.password) && form.password.length < 12) { setError('La contraseña debe tener al menos 12 caracteres.'); return }
     setSaving(true)
     setError('')
     try {
-      const account = await createAccount({ fullName: form.fullName, email: form.email, password: form.password, roles: [form.role] })
-      onCreated(account)
-      close()
+      const saved = account
+        ? await updateAccount(account.id, { fullName: form.fullName, email: form.email, active: form.active, roles: form.roles, ...(form.password ? { password: form.password } : {}) })
+        : await createAccount({ fullName: form.fullName, email: form.email, password: form.password, roles: form.roles })
+      onSaved(saved)
+      onClose()
     } catch (e) {
-      setError(e instanceof ApiError && e.code === 'VALIDATION_ERROR' ? 'Revisa el nombre y el correo.' : errorText(e))
+      setError(formErrorText(e))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Modal open={open} onClose={close} title="Añadir usuario" footer={<><Button variant="secondary" onClick={close}>Cancelar</Button><Button type="submit" form="create-account" disabled={saving}>{saving ? 'Guardando…' : 'Crear cuenta'}</Button></>}>
-      <form id="create-account" onSubmit={submit}>
+    <Modal open onClose={onClose} title={editing ? 'Editar usuario' : 'Añadir usuario'} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" form="account-form" disabled={saving}>{saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear cuenta'}</Button></>}>
+      <form id="account-form" className="account-form" onSubmit={submit}>
         <div className="form-grid">
           <label className="field-label">Nombre<Input required maxLength={120} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Nombre completo" /></label>
-          <label className="field-label">Correo<Input required type="email" maxLength={254} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="usuario@unp.edu.pe" /></label>
+          <label className="field-label">Correo<Input required type="email" maxLength={254} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={`usuario@${INSTITUTIONAL_DOMAIN}`} /><span className="field-hint">Solo correos @{INSTITUTIONAL_DOMAIN}</span></label>
         </div>
+        <fieldset className="role-picker">
+          <legend>Roles</legend>
+          {roleOrder.map((role) => {
+            const locked = self && role === 'ROLE_ADMIN'
+            return (
+              <label key={role} className={form.roles.includes(role) ? 'checked' : ''} title={locked ? 'No puedes quitarte el rol de administrador' : undefined}>
+                <input type="checkbox" checked={form.roles.includes(role)} disabled={locked} onChange={() => toggleRole(role)} />
+                {backendRoleLabels[role]}
+              </label>
+            )
+          })}
+        </fieldset>
         <div className="form-grid">
-          <label className="field-label">Rol<Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as BackendRole })}>{(Object.keys(backendRoleLabels) as BackendRole[]).map((role) => <option key={role} value={role}>{backendRoleLabels[role]}</option>)}</Select></label>
-          <label className="field-label">Contraseña inicial<Input required type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 12 caracteres" /></label>
+          <label className="field-label">{editing ? 'Nueva contraseña' : 'Contraseña inicial'}<Input required={!editing} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Déjala vacía para no cambiarla' : 'Mínimo 12 caracteres'} /></label>
+          {editing && <label className="field-label">Estado<Select value={form.active ? 'activo' : 'inactivo'} disabled={self} onChange={(e) => setForm({ ...form, active: e.target.value === 'activo' })}><option value="activo">Activo</option><option value="inactivo">Inactivo: no puede ingresar</option></Select></label>}
         </div>
         {error && <div className="error-note">{error}</div>}
       </form>
+    </Modal>
+  )
+}
+
+function DeleteAccountModal({ account, onClose, onDeleted }: { account: Account; onClose: () => void; onDeleted: () => void }) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const confirm = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await deleteAccount(account.id)
+      onDeleted()
+      onClose()
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Eliminar usuario" footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button variant="danger" onClick={confirm} disabled={busy}>{busy ? 'Eliminando…' : 'Eliminar cuenta'}</Button></>}>
+      <p>Vas a eliminar la cuenta de <strong>{account.fullName}</strong> ({account.email}). La persona ya no podrá ingresar y la acción no se puede deshacer.</p>
+      <p className="muted">El registro de auditoría conserva quién la eliminó y cuándo. Si solo quieres bloquear el acceso por un tiempo, edita la cuenta y márcala como inactiva.</p>
+      {error && <div className="error-note">{error}</div>}
     </Modal>
   )
 }
@@ -138,6 +220,8 @@ const auditLabels: Record<string, { text: string; tone: 'lavender' | 'blue' | 'm
   ADMIN_BOOTSTRAPPED: { text: 'Administrador inicial', tone: 'lavender' },
   USER_CREATED: { text: 'Cuenta creada', tone: 'blue' },
   USER_ROLES_CHANGED: { text: 'Roles modificados', tone: 'pink' },
+  USER_UPDATED: { text: 'Cuenta editada', tone: 'pink' },
+  USER_DELETED: { text: 'Cuenta eliminada', tone: 'danger' },
   CATALOG_CATEGORY_CREATED: { text: 'Categoría creada', tone: 'blue' },
   CATALOG_SERVICE_CREATED: { text: 'Servicio creado', tone: 'blue' },
   CATALOG_SERVICE_UPDATED: { text: 'Servicio modificado', tone: 'pink' },

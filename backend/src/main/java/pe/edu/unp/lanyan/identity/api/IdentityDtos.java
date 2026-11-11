@@ -25,6 +25,15 @@ public final class IdentityDtos {
         @Override public String toString() { return "CreateUserRequest[redacted]"; }
     }
 
+    /** password vacío o ausente conserva la contraseña actual. */
+    public record UpdateUserRequest(@NotBlank @Size(max = 120) String fullName,
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotNull Boolean active,
+            @NotEmpty Set<@NotNull RoleName> roles,
+            @Size(max = 72) String password) {
+        @Override public String toString() { return "UpdateUserRequest[redacted]"; }
+    }
+
     public record AssignRolesRequest(@NotEmpty Set<@NotNull RoleName> roles) { }
     public record UserView(UUID id, String fullName, String email, boolean active,
             Set<RoleName> roles, Set<String> permissions) { }

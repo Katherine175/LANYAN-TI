@@ -39,7 +39,7 @@ El listado administrativo está paginado, con tamaño máximo de 100.
 
 | Rol | Capacidades de Fase 1 |
 | --- | --- |
-| `ROLE_ADMIN` | Consultar y crear usuarios; consultar y asignar roles; consultar su identidad. |
+| `ROLE_ADMIN` | Consultar, crear, editar y eliminar usuarios; consultar y asignar roles; consultar su identidad. |
 | `ROLE_TECHNICIAN` | Autenticarse y consultar su identidad; preparado para acceso TI. |
 | `ROLE_USER` | Autenticarse y consultar su identidad; preparado para acceso TI. |
 | `ROLE_STUDENT` | Autenticarse y consultar su identidad; Fase 2.1 añade la consulta de su perfil académico propio. |
@@ -50,6 +50,20 @@ no significan que sus módulos o endpoints ya estén implementados.
 La asignación administrativa cambia el conjunto completo de roles. No se permite
 que un administrador retire su propio rol de administrador. Los cambios se
 serializan en PostgreSQL y se comprueba que el actor siga siendo administrador.
+
+## Correo institucional y mantenimiento de cuentas (V8)
+
+Las cuentas nuevas solo se crean con correo `@unp.edu.pe`, sin subdominios; se
+rechazan con `400 EMAIL_DOMAIN_NOT_ALLOWED`. La regla se aplica también al primer
+administrador y a cualquier cambio de correo. Las cuentas anteriores a la regla
+pueden seguir ingresando y editarse sin cambiar su correo.
+
+El administrador edita nombre, correo, estado, roles y, si lo indica, una nueva
+contraseña. No puede desactivarse, eliminarse ni quitarse el rol de administrador
+a sí mismo. Una cuenta con perfil académico no se elimina (`409
+USER_HAS_ACADEMIC_PROFILE`): se desactiva para conservar matrículas e historial.
+Editar y eliminar quedan en auditoría (`USER_UPDATED`, `USER_DELETED`); el
+registro sobrevive a la cuenta eliminada.
 
 ## Endpoints
 
@@ -65,6 +79,8 @@ Base local: `http://localhost:8080`.
 | `GET /api/v1/users?page=0&size=20` | ADMIN + `identity:users:read` | `200`, página de usuarios. |
 | `GET /api/v1/users/{id}` | ADMIN + `identity:users:read` | `200` o `404`. |
 | `POST /api/v1/users` | ADMIN + `identity:users:create` + CSRF | `201`, nueva cuenta. |
+| `PUT /api/v1/users/{id}` | ADMIN + `identity:users:update` + `identity:roles:assign` + CSRF | `200`, nombre, correo, estado, roles y contraseña opcional. |
+| `DELETE /api/v1/users/{id}` | ADMIN + `identity:users:delete` + CSRF | `204`, cuenta eliminada; `409` si es la propia o tiene perfil académico. |
 | `PUT /api/v1/users/{id}/roles` | ADMIN + `identity:roles:assign` + CSRF | `200`, roles actualizados. |
 | `GET /api/v1/roles` | ADMIN + `identity:roles:assign` | `200`, roles y permisos. |
 

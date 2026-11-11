@@ -35,6 +35,7 @@ public class BootstrapAdminProvisioner {
         var request = new CreateUserRequest(fullName, email, password, Set.of(RoleName.ROLE_ADMIN));
         if (!validator.validate(request).isEmpty()) throw new IllegalArgumentException("Datos de administrador inicial inválidos.");
         PasswordPolicy.validateNewPassword(password);
+        InstitutionalEmail.require(UserAccount.normalizeEmail(email));
         var adminRoles = roles.findAllByNameIn(request.roles());
         if (adminRoles.size() != 1) throw new IllegalStateException("No se encuentra el rol administrador; revisa las migraciones.");
         var admin = users.saveAndFlush(new UserAccount(fullName, email, passwords.encode(password), adminRoles));

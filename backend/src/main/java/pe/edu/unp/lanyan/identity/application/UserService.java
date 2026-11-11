@@ -1,5 +1,6 @@
 package pe.edu.unp.lanyan.identity.application;
 
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.List;
 import java.util.EnumSet;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pe.edu.unp.lanyan.audit.application.AuditService;
 import pe.edu.unp.lanyan.audit.domain.AuditAction;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.CreateUserRequest;
+import pe.edu.unp.lanyan.identity.api.IdentityDtos.UpdateUserRequest;
 import pe.edu.unp.lanyan.identity.api.IdentityDtos.UserView;
 import pe.edu.unp.lanyan.identity.domain.Role;
 import pe.edu.unp.lanyan.identity.domain.RoleName;
@@ -49,6 +51,7 @@ public class UserService {
     public UserView create(CreateUserRequest request) {
         PasswordPolicy.validateNewPassword(request.password());
         var email = UserAccount.normalizeEmail(request.email());
+        InstitutionalEmail.require(email);
         if (users.existsByEmail(email)) {
             throw new IdentityException(HttpStatus.CONFLICT, "EMAIL_EXISTS", "El correo ya está registrado.");
         }
@@ -73,11 +76,7 @@ public class UserService {
     @Transactional
     @PreAuthorize("hasAuthority('identity:roles:assign')")
     public UserView assignRoles(UUID id, Set<RoleName> requested, UUID actorId) {
-        // Serializa cambios de roles para impedir que dos administradores se retiren el acceso entre sí.
-        jdbc.execute("SELECT pg_advisory_xact_lock(764202601)");
-        if (!find(actorId).getRoles().stream().anyMatch(role -> role.getName() == RoleName.ROLE_ADMIN)) {
-            throw new AccessDeniedException("Se requiere un administrador vigente.");
-        }
+        lockAndRequireAdmin(actorId);
         var resolved = resolveRoles(requested);
         var account = find(id);
         // El administrador conserva su propio acceso; otra cuenta administradora puede cambiarlo.
@@ -91,6 +90,69 @@ public class UserService {
         return updated;
     }
 
+    @Transactional
+    @PreAuthorize("hasAuthority('identity:users:update') and hasAuthority('identity:roles:assign')")
+    public UserView update(UUID id, UpdateUserRequest request, UUID actorId) {
+        lockAndRequireAdmin(actorId);
+        var account = find(id);
+        var self = actorId.equals(id);
+        if (self && !request.roles().contains(RoleName.ROLE_ADMIN)) {
+            throw new IdentityException(HttpStatus.CONFLICT, "SELF_ADMIN_REMOVAL",
+                    "No puedes retirar tu propio rol de administrador.");
+        }
+        if (self && !request.active()) {
+            throw new IdentityException(HttpStatus.CONFLICT, "SELF_DEACTIVATION", "No puedes desactivar tu propia cuenta.");
+        }
+
+        var changes = new ArrayList<String>();
+        var email = UserAccount.normalizeEmail(request.email());
+        // Las cuentas creadas antes de la regla conservan su correo hasta que se cambie.
+        if (!email.equals(account.getEmail())) {
+            InstitutionalEmail.require(email);
+            if (users.existsByEmail(email)) {
+                throw new IdentityException(HttpStatus.CONFLICT, "EMAIL_EXISTS", "El correo ya está registrado.");
+            }
+            changes.add("correo " + account.getEmail() + " -> " + email);
+        }
+        if (!request.fullName().trim().equals(account.getFullName())) changes.add("nombre");
+        var resolved = resolveRoles(request.roles());
+        if (!request.roles().equals(roleNames(account))) changes.add("roles=" + new TreeSet<>(request.roles()));
+        if (request.active() != account.isActive()) changes.add(request.active() ? "cuenta activada" : "cuenta desactivada");
+
+        var password = request.password();
+        if (password != null && !password.isEmpty()) {
+            PasswordPolicy.validateNewPassword(password);
+            account.changePasswordHash(passwords.encode(password));
+            changes.add("contraseña restablecida");
+        }
+
+        account.update(request.fullName(), email, request.active(), resolved);
+        var updated = view(users.saveAndFlush(account));
+        audit.record(AuditAction.USER_UPDATED, "USER", updated.id().toString(),
+                changes.isEmpty() ? "sin cambios" : String.join("; ", changes));
+        return updated;
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('identity:users:delete')")
+    public void delete(UUID id, UUID actorId) {
+        lockAndRequireAdmin(actorId);
+        if (actorId.equals(id)) {
+            throw new IdentityException(HttpStatus.CONFLICT, "SELF_DELETE", "No puedes eliminar tu propia cuenta.");
+        }
+        var account = find(id);
+        // Un estudiante con perfil tiene matrículas e historial: se desactiva, no se borra.
+        var profiles = jdbc.queryForObject("SELECT count(*) FROM academic_student_profiles WHERE user_id = ?", Long.class, id);
+        if (profiles != null && profiles > 0) {
+            throw new IdentityException(HttpStatus.CONFLICT, "USER_HAS_ACADEMIC_PROFILE",
+                    "Esta cuenta tiene un perfil académico. Desactívala para conservar su historial.");
+        }
+        var detail = "correo=" + account.getEmail() + "; roles=" + roleNames(account);
+        users.delete(account);
+        users.flush();
+        audit.record(AuditAction.USER_DELETED, "USER", id.toString(), detail);
+    }
+
     @PreAuthorize("hasAuthority('identity:roles:assign')")
     public List<RoleView> listRoles() {
         return roles.findAllByNameIn(EnumSet.allOf(RoleName.class)).stream()
@@ -98,6 +160,18 @@ public class UserService {
                 .map(role -> new RoleView(role.getName(), role.getPermissions().stream()
                         .map(permission -> permission.getName()).collect(Collectors.toSet())))
                 .toList();
+    }
+
+    /** Serializa los cambios de cuentas para que dos administradores no se retiren el acceso entre sí. */
+    private void lockAndRequireAdmin(UUID actorId) {
+        jdbc.execute("SELECT pg_advisory_xact_lock(764202601)");
+        if (!roleNames(find(actorId)).contains(RoleName.ROLE_ADMIN)) {
+            throw new AccessDeniedException("Se requiere un administrador vigente.");
+        }
+    }
+
+    private static Set<RoleName> roleNames(UserAccount account) {
+        return account.getRoles().stream().map(Role::getName).collect(Collectors.toCollection(TreeSet::new));
     }
 
     private UserAccount find(UUID id) {

@@ -32,6 +32,18 @@ public class UserController {
     @GetMapping("/users/{id}")
     public UserView get(@PathVariable UUID id) { return users.current(id); }
 
+    @PutMapping("/users/{id}")
+    public UserView update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request,
+            @AuthenticationPrincipal AccountPrincipal principal) {
+        return users.update(id, request, principal.getId());
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal AccountPrincipal principal) {
+        users.delete(id, principal.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/users/{id}/roles")
     public UserView roles(@PathVariable UUID id, @Valid @RequestBody AssignRolesRequest request,
             @AuthenticationPrincipal AccountPrincipal principal) {

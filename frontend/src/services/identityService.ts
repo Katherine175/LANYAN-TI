@@ -78,5 +78,15 @@ export async function logout(): Promise<void> {
 export const listAccounts = () => api<Page<Account>>('/users?page=0&size=100')
 export const createAccount = (body: { fullName: string; email: string; password: string; roles: BackendRole[] }) =>
   api<Account>('/users', { method: 'POST', body })
+export const updateAccount = (id: string, body: { fullName: string; email: string; active: boolean; roles: BackendRole[]; password?: string }) =>
+  api<Account>(`/users/${id}`, { method: 'PUT', body })
+export const deleteAccount = (id: string) => api<void>(`/users/${id}`, { method: 'DELETE' })
 export const listRoles = () => api<RoleSummary[]>('/roles')
+
+export const INSTITUTIONAL_DOMAIN = 'unp.edu.pe'
+export const isInstitutionalEmail = (email: string) => {
+  const value = email.trim().toLowerCase()
+  const at = value.indexOf('@')
+  return at > 0 && at === value.lastIndexOf('@') && value.slice(at + 1) === INSTITUTIONAL_DOMAIN
+}
 export const listAudit = (page: number) => api<Page<AuditEvent>>(`/audit/events?page=${page}&size=20`)
