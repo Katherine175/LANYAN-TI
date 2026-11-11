@@ -2,13 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react'
 import {
   Activity, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
   ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, Gauge,
-  Headphones, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, LogOut, Menu,
+  Headphones, KeyRound, LayoutDashboard, Lightbulb, LogOut, Menu,
   Plus, RefreshCw, Search, Settings2,
   SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck,
   Wrench, X, Zap, GraduationCap, type LucideIcon,
 } from 'lucide-react'
-import { articles, problems, requests, services } from './data/mockData'
-import type { Role, RouteKey, WorkflowRequest } from './types'
+import { articles, problems, services } from './data/mockData'
+import type { Role, RouteKey } from './types'
+import { AccessPage, ServiceRequestsPage } from './pages/workflows'
 import { DashboardTickets, isStaff, ServiceDesk, SlaConfigPanel, TicketsPage, useTickets, useTicketStats } from './pages/tickets'
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
@@ -47,7 +48,6 @@ function App() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [route, setRoute] = useState<RouteKey>('dashboard')
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [requestList, setRequestList] = useState<WorkflowRequest[]>(requests)
   const [toast, setToast] = useState('')
 
   useEffect(() => {
@@ -112,8 +112,8 @@ function App() {
           {view === 'tickets' && <TicketsPage role={role} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}
-          {view === 'accesos' && <WorkflowPage mode="Acceso" staff={isStaff(role)} items={requestList} setItems={setRequestList} notify={notify} />}
-          {view === 'solicitudes' && <WorkflowPage mode="Servicio" staff={isStaff(role)} items={requestList} setItems={setRequestList} notify={notify} />}
+          {view === 'accesos' && <AccessPage role={role} email={account.email} notify={notify} />}
+          {view === 'solicitudes' && <ServiceRequestsPage role={role} email={account.email} notify={notify} />}
           {view === 'operaciones' && <Operations notify={notify} />}
           {view === 'conocimiento' && <Knowledge notify={notify} />}
           {view === 'reportes' && <Reports notify={notify} />}
@@ -278,32 +278,6 @@ function Problems({ notify }: { notify: (message: string) => void }) {
         <label className="field-label">Causa raíz<Textarea rows={3} defaultValue={selected?.cause} /></label>
         <label className="field-label">Solución permanente<Textarea rows={4} placeholder="Documenta la acción correctiva..." /></label>
         <div className="form-grid"><label className="field-label">Estado<Select defaultValue={selected?.status}><option>Investigando</option><option>Causa identificada</option><option>Resuelto</option></Select></label><label className="field-label">Fecha objetivo<Input type="date" defaultValue="2025-06-21" /></label></div>
-      </Modal>
-    </>
-  )
-}
-
-function WorkflowPage({ mode, staff, items, setItems, notify }: { mode: 'Acceso' | 'Servicio'; staff: boolean; items: WorkflowRequest[]; setItems: (items: WorkflowRequest[]) => void; notify: (message: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [filter, setFilter] = useState('Todos')
-  const list = items.filter((item) => item.type === mode && (filter === 'Todos' || item.status === filter))
-  const title = mode === 'Acceso' ? 'Gestión de accesos' : 'Solicitudes de servicio'
-  const approve = (id: string, status: WorkflowRequest['status']) => { setItems(items.map((item) => item.id === id ? { ...item, status } : item)); notify(`Solicitud ${status.toLowerCase()}`) }
-  const create = () => {
-    const prefix = mode === 'Acceso' ? 'ACC' : 'SOL'
-    setItems([{ id: `${prefix}-${210 + items.length}`, title: mode === 'Acceso' ? 'Nueva solicitud de permisos' : 'Nueva solicitud de servicio', requester: 'Andrea Salazar', type: mode, status: 'Pendiente', date: 'Hoy', approver: 'Jefatura TI' }, ...items]); setOpen(false); notify('Solicitud registrada')
-  }
-  return (
-    <>
-      <PageHeader eyebrow={mode === 'Acceso' ? 'Seguridad y permisos' : 'Flujo de atención'} title={title} description={mode === 'Acceso' ? 'Solicita, aprueba y revoca permisos de forma segura.' : 'Registra y sigue cada solicitud hasta su cierre.'} action={<Button onClick={() => setOpen(true)}><Plus size={17} />Nueva solicitud</Button>} />
-      <div className="notice-note"><CircleAlert size={17} />Vista de demostración: estas solicitudes todavía no se guardan en el sistema.</div>
-      <div className="workflow-tabs">{['Todos', 'Pendiente', 'Aprobado', 'En proceso', 'Cerrado'].map((item) => <Button key={item} variant={filter === item ? 'primary' : 'secondary'} onClick={() => setFilter(item)}>{item}</Button>)}</div>
-      <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>Solicitud</th><th>Solicitante</th><th>Fecha</th><th>Aprobador</th><th>Estado</th>{staff && <th>Acciones</th>}</tr></thead><tbody>{list.map((item) => <tr key={item.id}><td><strong>{item.id}</strong><span>{item.title}</span></td><td>{item.requester}</td><td>{item.date}</td><td>{item.approver}</td><td><Badge tone={statusTone(item.status)}>{item.status}</Badge></td>{staff && <td><div className="row-actions">{item.status === 'Pendiente' && <Button variant="ghost" onClick={() => approve(item.id, 'Aprobado')}><Check size={16} />Aprobar</Button>}{mode === 'Acceso' && item.status === 'Aprobado' && <Button variant="danger" onClick={() => approve(item.id, 'Revocado')}><LockKeyhole size={15} />Revocar</Button>}{mode === 'Servicio' && item.status === 'En proceso' && <Button variant="ghost" onClick={() => approve(item.id, 'Cerrado')}><CheckCircle2 size={16} />Cerrar</Button>}</div></td>}</tr>)}</tbody></table></div></Card>
-      <Modal open={open} onClose={() => setOpen(false)} title={mode === 'Acceso' ? 'Solicitar acceso' : 'Registrar solicitud'} footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={create}>Enviar solicitud</Button></>}>
-        <label className="field-label">{mode === 'Acceso' ? 'Sistema o recurso' : 'Servicio'}<Select>{services.slice(0, 5).map((service) => <option key={service.id}>{service.name}</option>)}</Select></label>
-        {mode === 'Acceso' && <label className="field-label">Nivel de permiso<Select><option>Solo lectura</option><option>Editor</option><option>Administrador</option></Select></label>}
-        <label className="field-label">Justificación<Textarea rows={4} placeholder="Explica el motivo y el resultado esperado..." /></label>
-        <label className="field-label">Fecha requerida<Input type="date" /></label>
       </Modal>
     </>
   )

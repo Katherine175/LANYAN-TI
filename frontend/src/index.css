@@ -370,6 +370,9 @@ td:first-child strong, td:first-child span { display: block; } td:first-child st
 .staff-actions .inline-form { align-self: stretch; }
 .sla-breached, .sla-missed { color: #a3364a !important; font-weight: 700; }
 .sla-at_risk { color: #8a5a12 !important; font-weight: 700; }
+/* Segunda línea gris en celdas que no son la primera (responsable, correo, motivo). */
+td:not(:first-child) > span:not(.badge):not(.muted):not(.email-warning) { display: block; margin-top: .18rem; color: var(--ink-3); font-size: .66rem; }
 td > span.muted { display: inline; }
 @media (max-width: 640px) { .priority-preview { grid-template-columns: 1fr; } }
 .deadlines .muted { font-size: .72rem; line-height: 1.5; }
+.account-form > p.muted { font-size: .76rem; line-height: 1.5; }

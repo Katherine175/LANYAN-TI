@@ -1,2 +1,2 @@
-/** Reserva el módulo de solicitudes de acceso y concesiones; sin implementación funcional. */
+/** Gestión de accesos: solicitud, concesión, vencimiento y revocación de permisos sobre recursos. */
 package pe.edu.unp.lanyan.access;
