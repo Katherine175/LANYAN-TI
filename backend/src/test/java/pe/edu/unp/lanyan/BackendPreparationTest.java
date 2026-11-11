@@ -56,7 +56,7 @@ class BackendPreparationTest {
 
     @Test
     void allMigrationsAreAppliedAndValidatedOnPostgreSql() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("12");
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success = true",
@@ -75,7 +75,7 @@ class BackendPreparationTest {
                 .containsExactlyInAnyOrder("flyway_schema_history", "identity_users", "identity_roles",
                         "identity_permissions", "identity_user_roles", "identity_role_permissions", "academic_student_profiles",
                         "academic_courses", "academic_course_sections", "academic_enrollments",
-                        "academic_class_schedules", "academic_course_materials", "audit_events", "catalog_categories", "catalog_services");
+                        "academic_class_schedules", "academic_course_materials", "audit_events", "catalog_categories", "catalog_services", "sla_policies", "tickets");
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM flyway_schema_history WHERE version = '5' AND success = true",
                 Integer.class)).isEqualTo(1);

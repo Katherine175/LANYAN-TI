@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
+  Activity, ArrowRight, BarChart3, BookOpen, Check, CheckCircle2,
   ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, Gauge,
   Headphones, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, LogOut, Menu,
-  MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings2,
-  SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck, Users,
+  Plus, RefreshCw, Search, Settings2,
+  SlidersHorizontal, Sparkles, TicketCheck, TrendingUp, UserCheck,
   Wrench, X, Zap, GraduationCap, type LucideIcon,
 } from 'lucide-react'
-import { articles, monthlyData, problems, requests, services, tickets as initialTickets } from './data/mockData'
-import type { Priority, Role, RouteKey, Ticket, TicketStatus, WorkflowRequest } from './types'
+import { articles, problems, requests, services } from './data/mockData'
+import type { Role, RouteKey, WorkflowRequest } from './types'
+import { DashboardTickets, isStaff, ServiceDesk, SlaConfigPanel, TicketsPage, useTickets, useTicketStats } from './pages/tickets'
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select, Textarea } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
 import { AuditPanel, RolesPanel, UsersPanel } from './pages/administration'
 import { CourseCatalog, CoursesPanel, MyCourses } from './pages/courses'
 import { SESSION_EXPIRED_EVENT } from './services/api'
-import { listPublishedServices } from './services/catalogService'
 import { currentAccount, initials, login, logout, mainRoleLabel, portalRole, type Account } from './services/identityService'
 
 const navItems: { id: RouteKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
@@ -47,7 +47,6 @@ function App() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [route, setRoute] = useState<RouteKey>('dashboard')
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [ticketList, setTicketList] = useState<Ticket[]>(initialTickets)
   const [requestList, setRequestList] = useState<WorkflowRequest[]>(requests)
   const [toast, setToast] = useState('')
 
@@ -106,15 +105,15 @@ function App() {
       <div className="app-main">
         <Header account={account} onMenu={() => setMobileMenu(true)} />
         <main className="page-wrap">
-          {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
+          {view === 'dashboard' && <Dashboard account={account} role={role} onNavigate={navigate} />}
           {view === 'catalogo' && <Catalog canOperate={role === 'tecnico' || role === 'administrador'} notify={notify} onNavigate={navigate} />}
           {view === 'cursos' && <CourseCatalog isAdmin={role === 'administrador'} notify={notify} onOpenMyCourses={() => navigate('mis-cursos')} />}
           {view === 'mis-cursos' && <MyCourses onOpenCatalog={() => navigate('cursos')} notify={notify} />}
-          {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
-          {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
+          {view === 'tickets' && <TicketsPage role={role} notify={notify} />}
+          {view === 'service-desk' && <ServiceDesk notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}
-          {view === 'accesos' && <WorkflowPage mode="Acceso" items={requestList} setItems={setRequestList} notify={notify} />}
-          {view === 'solicitudes' && <WorkflowPage mode="Servicio" items={requestList} setItems={setRequestList} notify={notify} />}
+          {view === 'accesos' && <WorkflowPage mode="Acceso" staff={isStaff(role)} items={requestList} setItems={setRequestList} notify={notify} />}
+          {view === 'solicitudes' && <WorkflowPage mode="Servicio" staff={isStaff(role)} items={requestList} setItems={setRequestList} notify={notify} />}
           {view === 'operaciones' && <Operations notify={notify} />}
           {view === 'conocimiento' && <Knowledge notify={notify} />}
           {view === 'reportes' && <Reports notify={notify} />}
@@ -231,95 +230,38 @@ const longDate = () => {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-function Dashboard({ account, onNavigate, tickets }: { account: Account; onNavigate: (route: RouteKey) => void; tickets: Ticket[] }) {
-  const stats = [
-    { label: 'Tickets abiertos', value: '24', delta: '8% menos', icon: TicketCheck, tone: 'lavender' },
-    { label: 'Resueltos este mes', value: '142', delta: '12% más', icon: CheckCircle2, tone: 'mint' },
-    { label: 'Pendientes', value: '11', delta: '3 requieren atención', icon: Clock3, tone: 'pink' },
-    { label: 'Cumplimiento SLA', value: '94.8%', delta: 'Meta 92%', icon: Gauge, tone: 'blue' },
+function Dashboard({ account, role, onNavigate }: { account: Account; role: Role; onNavigate: (route: RouteKey) => void }) {
+  const { tickets } = useTickets(role)
+  const stats = useTicketStats(tickets)
+  const staff = isStaff(role)
+  const cards = [
+    { label: staff ? 'Tickets abiertos' : 'Mis tickets abiertos', value: String(stats.open), delta: `${stats.waiting} sin atender`, icon: TicketCheck, tone: 'lavender' },
+    { label: 'Resueltos', value: String(stats.resolved), delta: `${stats.met} dentro del plazo`, icon: CheckCircle2, tone: 'mint' },
+    { label: 'Por vencer o vencidos', value: String(stats.atRisk), delta: `${stats.breachedOpen} ya vencidos`, icon: Clock3, tone: 'pink' },
+    { label: 'Cumplimiento SLA', value: stats.compliance === null ? '—' : `${stats.compliance}%`, delta: stats.compliance === null ? 'Aún sin tickets resueltos' : 'De los tickets resueltos', icon: Gauge, tone: 'blue' },
   ]
+  const peak = Math.max(1, ...stats.months.flatMap((item) => [item.opened, item.resolved]))
+  const compliance = stats.compliance ?? 0
   return (
     <>
-      <PageHeader eyebrow={longDate()} title={`${greeting()}, ${account.fullName.trim().split(/\s+/)[0]}`} description="Aquí tienes el pulso de los servicios TI de hoy." action={<Button onClick={() => onNavigate('tickets')}><Plus size={17} />Nuevo ticket</Button>} />
-      <div className="stat-grid">{stats.map(({ label, value, delta, icon: Icon, tone }) => <Card className="stat-card" key={label}><div className={`stat-icon icon-${tone}`}><Icon size={20} /></div><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small>{delta.includes('menos') || delta.includes('más') || delta.includes('Meta') ? <TrendingUp size={13} /> : <CircleAlert size={13} />}{delta}</small></div><MoreHorizontal size={18} className="more" /></Card>)}</div>
+      <PageHeader eyebrow={longDate()} title={`${greeting()}, ${account.fullName.trim().split(/\s+/)[0]}`} description={staff ? 'Aquí tienes el pulso de los servicios TI de hoy.' : 'Aquí ves el avance de tus tickets.'} action={<Button onClick={() => onNavigate('tickets')}><Plus size={17} />Nuevo ticket</Button>} />
+      <div className="stat-grid">{cards.map(({ label, value, delta, icon: Icon, tone }) => <Card className="stat-card" key={label}><div className={`stat-icon icon-${tone}`}><Icon size={20} /></div><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small>{delta}</small></div></Card>)}</div>
       <div className="dashboard-grid">
         <Card className="chart-card">
-          <div className="card-title"><div><h2>Rendimiento de tickets</h2><p>Comparativo mensual de solicitudes</p></div><Select defaultValue="6"><option value="6">Últimos 6 meses</option><option value="12">Último año</option></Select></div>
-          <div className="legend"><span><i className="dot lavender" />Abiertos</span><span><i className="dot mint" />Resueltos</span></div>
-          <div className="bar-chart">{monthlyData.map((item) => <div className="bar-group" key={item.month}><div className="bars"><span className="bar lavender-bar" style={{ height: `${item.opened * 1.7}px` }} title={`${item.opened} abiertos`} /><span className="bar mint-bar" style={{ height: `${item.resolved * 1.7}px` }} title={`${item.resolved} resueltos`} /></div><small>{item.month}</small></div>)}</div>
+          <div className="card-title"><div><h2>Rendimiento de tickets</h2><p>Registrados y resueltos en los últimos 6 meses</p></div></div>
+          <div className="legend"><span><i className="dot lavender" />Registrados</span><span><i className="dot mint" />Resueltos</span></div>
+          <div className="bar-chart">{stats.months.map((item) => <div className="bar-group" key={item.month}><div className="bars"><span className="bar lavender-bar" style={{ height: `${(item.opened / peak) * 170}px` }} title={`${item.opened} registrados`} /><span className="bar mint-bar" style={{ height: `${(item.resolved / peak) * 170}px` }} title={`${item.resolved} resueltos`} /></div><small>{item.month}</small></div>)}</div>
         </Card>
         <Card className="sla-card">
-          <div className="card-title"><div><h2>Salud del SLA</h2><p>Objetivo mensual</p></div><Badge tone="mint">En objetivo</Badge></div>
-          <div className="donut" style={{ background: 'conic-gradient(var(--lavender-strong) 0 94.8%, var(--surface-2) 94.8%)' }}><div><strong>94.8%</strong><span>cumplimiento</span></div></div>
-          <div className="sla-list"><div><span>Dentro del SLA</span><strong>135</strong></div><div><span>Próximos a vencer</span><strong>5</strong></div><div><span>Vencidos</span><strong>2</strong></div></div>
+          <div className="card-title"><div><h2>Salud del SLA</h2><p>Tickets resueltos dentro del plazo</p></div>{stats.compliance !== null && <Badge tone={compliance >= 90 ? 'mint' : 'pink'}>{compliance >= 90 ? 'En objetivo' : 'Bajo la meta'}</Badge>}</div>
+          <div className="donut" style={{ background: `conic-gradient(var(--lavender-strong) 0 ${compliance}%, var(--surface-2) ${compliance}%)` }}><div><strong>{stats.compliance === null ? '—' : `${compliance}%`}</strong><span>cumplimiento</span></div></div>
+          <div className="sla-list"><div><span>Resueltos a tiempo</span><strong>{stats.met}</strong></div><div><span>Abiertos por vencer o vencidos</span><strong>{stats.atRisk}</strong></div><div><span>Resueltos fuera de plazo</span><strong>{stats.missed}</strong></div></div>
         </Card>
       </div>
       <Card className="table-card">
-        <div className="card-title"><div><h2>Actividad reciente</h2><p>Tickets que necesitan seguimiento</p></div><Button variant="ghost" onClick={() => onNavigate('tickets')}>Ver todos <ArrowRight size={16} /></Button></div>
-        <TicketTable tickets={tickets.slice(0, 5)} />
+        <div className="card-title"><div><h2>Actividad reciente</h2><p>{staff ? 'Últimos tickets registrados' : 'Tus últimos tickets'}</p></div><Button variant="ghost" onClick={() => onNavigate('tickets')}>Ver todos <ArrowRight size={16} /></Button></div>
+        <DashboardTickets tickets={tickets} />
       </Card>
-    </>
-  )
-}
-
-function TicketsPage({ role, tickets, setTickets, notify }: { role: Role; tickets: Ticket[]; setTickets: (tickets: Ticket[]) => void; notify: (message: string) => void }) {
-  const selfService = role === 'usuario' || role === 'estudiante'
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('Todos')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [selected, setSelected] = useState<Ticket | null>(null)
-  const [serviceNames, setServiceNames] = useState<string[]>([])
-  useEffect(() => { listPublishedServices().then((page) => setServiceNames(page.content.map((service) => service.name))).catch(() => undefined) }, [])
-  const [form, setForm] = useState({ title: '', service: 'Plataforma virtual', description: '', priority: 'Media' as Priority })
-  const filtered = tickets.filter((ticket) => (status === 'Todos' || ticket.status === status) && `${ticket.title} ${ticket.id}`.toLowerCase().includes(query.toLowerCase()))
-
-  const createTicket = () => {
-    if (!form.title.trim()) return
-    const ticket: Ticket = { id: `INC-${1050 + tickets.length}`, title: form.title, service: form.service, description: form.description, requester: 'Andrea Salazar', technician: 'Sin asignar', priority: form.priority, status: 'Nuevo', createdAt: 'Ahora', sla: 100, comments: 0 }
-    setTickets([ticket, ...tickets]); setCreateOpen(false); notify(`${ticket.id} registrado correctamente`); setForm({ title: '', service: 'Plataforma virtual', description: '', priority: 'Media' })
-  }
-  const updateStatus = (next: TicketStatus) => {
-    if (!selected) return
-    const updated = { ...selected, status: next }
-    setTickets(tickets.map((ticket) => ticket.id === selected.id ? updated : ticket)); setSelected(updated); notify('Estado actualizado')
-  }
-  return (
-    <>
-      <PageHeader eyebrow="Gestión de atención" title={selfService ? 'Mis tickets' : 'Tickets'} description={selfService ? 'Consulta y da seguimiento a tus solicitudes.' : 'Gestiona incidentes y solicitudes desde un solo lugar.'} action={<Button onClick={() => setCreateOpen(true)}><Plus size={17} />Registrar ticket</Button>} />
-      <Card className="toolbar"><div className="table-search"><Search size={17} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por ID o asunto" /></div><div className="toolbar-right"><Select value={status} onChange={(e) => setStatus(e.target.value)}><option>Todos</option><option>Nuevo</option><option>En progreso</option><option>En espera</option><option>Resuelto</option></Select><Button variant="secondary"><SlidersHorizontal size={16} />Más filtros</Button></div></Card>
-      <Card className="table-card"><div className="result-count"><strong>{filtered.length} tickets</strong><span>Actualizado hace unos segundos</span></div><TicketTable tickets={filtered} onSelect={setSelected} /></Card>
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Registrar nuevo ticket" footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button onClick={createTicket}>Registrar ticket</Button></>}>
-        <label className="field-label">Asunto<Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Resume el problema en una frase" /></label>
-        <div className="form-grid"><label className="field-label">Servicio<Select value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}>{serviceNames.map((name) => <option key={name}>{name}</option>)}</Select></label><label className="field-label">Prioridad<Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Priority })}><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></Select></label></div>
-        <label className="field-label">Descripción<Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Incluye los pasos, mensajes de error y cuándo comenzó..." /></label>
-        <div className="upload-zone"><Plus size={20} /><strong>Adjuntar evidencia</strong><span>PNG, JPG o PDF hasta 10 MB</span></div>
-      </Modal>
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={`${selected?.id} · ${selected?.title}`} footer={<Button onClick={() => { notify('Comentario agregado'); setSelected(null) }}><MessageSquare size={16} />Añadir comentario</Button>}>
-        {selected && <><div className="detail-grid"><div><span>Estado</span><Badge tone={statusTone(selected.status)}>{selected.status}</Badge></div><div><span>Prioridad</span><Badge tone={statusTone(selected.priority)}>{selected.priority}</Badge></div><div><span>Técnico</span><strong>{selected.technician}</strong></div><div><span>SLA restante</span><strong>{selected.sla}%</strong></div></div>
-        <div className="status-actions">{(['Nuevo', 'En progreso', 'En espera', 'Resuelto'] as TicketStatus[]).map((item) => <Button key={item} variant={selected.status === item ? 'primary' : 'secondary'} onClick={() => updateStatus(item)}>{item}</Button>)}</div>
-        <div className="comment-box"><div className="avatar small">CV</div><div><strong>Carlos Vega</strong><small>Hace 12 min</small><p>Estamos validando las credenciales con el equipo de plataforma.</p></div></div>
-        <label className="field-label">Nuevo comentario<Textarea rows={3} placeholder="Escribe una actualización..." /></label></>}
-      </Modal>
-    </>
-  )
-}
-
-function TicketTable({ tickets, onSelect }: { tickets: Ticket[]; onSelect?: (ticket: Ticket) => void }) {
-  return <div className="table-scroll"><table><thead><tr><th>Ticket</th><th>Servicio</th><th>Prioridad</th><th>Estado</th><th>Técnico</th><th>SLA</th><th /></tr></thead><tbody>{tickets.map((ticket) => <tr key={ticket.id} onClick={() => onSelect?.(ticket)} className={onSelect ? 'clickable' : ''}><td><strong>{ticket.id}</strong><span>{ticket.title}</span></td><td>{ticket.service}</td><td><Badge tone={statusTone(ticket.priority)}>{ticket.priority}</Badge></td><td><Badge tone={statusTone(ticket.status)}>{ticket.status}</Badge></td><td><div className="person-cell"><div className="avatar mini">{ticket.technician.split(' ').map((word) => word[0]).join('').slice(0, 2)}</div>{ticket.technician}</div></td><td><div className="sla-cell"><Progress value={ticket.sla} tone={ticket.sla < 40 ? 'pink' : 'mint'} /><small>{ticket.sla}%</small></div></td><td><ChevronRight size={17} /></td></tr>)}</tbody></table>{tickets.length === 0 && <div className="empty-state"><Search size={24} /><strong>Sin resultados</strong><span>Prueba con otros filtros.</span></div>}</div>
-}
-
-function ServiceDesk({ tickets, setTickets, notify }: { tickets: Ticket[]; setTickets: (tickets: Ticket[]) => void; notify: (message: string) => void }) {
-  const statuses: TicketStatus[] = ['Nuevo', 'En progreso', 'En espera', 'Resuelto']
-  const move = (ticket: Ticket, direction: number) => {
-    const index = statuses.indexOf(ticket.status)
-    const next = statuses[Math.max(0, Math.min(statuses.length - 1, index + direction))]
-    setTickets(tickets.map((item) => item.id === ticket.id ? { ...item, status: next } : item)); notify(`${ticket.id} movido a ${next}`)
-  }
-  return (
-    <>
-      <PageHeader eyebrow="Centro de atención" title="Service Desk" description="Prioriza, asigna y resuelve el trabajo del equipo en tiempo real." action={<div className="header-actions"><Button variant="secondary"><Users size={16} />3 técnicos activos</Button><Button><Plus size={17} />Asignar ticket</Button></div>} />
-      <div className="desk-summary"><span><i className="dot blue" />6 en cola</span><span><i className="dot pink" />2 críticos</span><span><i className="dot mint" />18 min respuesta media</span></div>
-      <div className="kanban">{statuses.map((status) => <div className="kanban-column" key={status}><div className="kanban-head"><div><i className={`dot ${status === 'Nuevo' ? 'blue' : status === 'Resuelto' ? 'mint' : status === 'En espera' ? 'pink' : 'lavender'}`} /><strong>{status}</strong><span>{tickets.filter((item) => item.status === status).length}</span></div><Button variant="ghost" className="icon-btn"><Plus size={17} /></Button></div><div className="kanban-list">{tickets.filter((item) => item.status === status).map((ticket) => <Card className="kanban-card" key={ticket.id}><div className="kanban-card-top"><Badge tone={statusTone(ticket.priority)}>{ticket.priority}</Badge><span>{ticket.id}</span></div><h3>{ticket.title}</h3><p>{ticket.service}</p><div className="kanban-footer"><div className="avatar mini">{ticket.technician.split(' ').map((v) => v[0]).join('').slice(0, 2)}</div><span><Clock3 size={13} />{ticket.sla}% SLA</span><div><Button variant="ghost" className="icon-btn" onClick={() => move(ticket, -1)} disabled={status === 'Nuevo'}><ArrowLeft size={14} /></Button><Button variant="ghost" className="icon-btn" onClick={() => move(ticket, 1)} disabled={status === 'Resuelto'}><ArrowRight size={14} /></Button></div></div></Card>)}</div></div>)}</div>
     </>
   )
 }
@@ -341,7 +283,7 @@ function Problems({ notify }: { notify: (message: string) => void }) {
   )
 }
 
-function WorkflowPage({ mode, items, setItems, notify }: { mode: 'Acceso' | 'Servicio'; items: WorkflowRequest[]; setItems: (items: WorkflowRequest[]) => void; notify: (message: string) => void }) {
+function WorkflowPage({ mode, staff, items, setItems, notify }: { mode: 'Acceso' | 'Servicio'; staff: boolean; items: WorkflowRequest[]; setItems: (items: WorkflowRequest[]) => void; notify: (message: string) => void }) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('Todos')
   const list = items.filter((item) => item.type === mode && (filter === 'Todos' || item.status === filter))
@@ -354,8 +296,9 @@ function WorkflowPage({ mode, items, setItems, notify }: { mode: 'Acceso' | 'Ser
   return (
     <>
       <PageHeader eyebrow={mode === 'Acceso' ? 'Seguridad y permisos' : 'Flujo de atención'} title={title} description={mode === 'Acceso' ? 'Solicita, aprueba y revoca permisos de forma segura.' : 'Registra y sigue cada solicitud hasta su cierre.'} action={<Button onClick={() => setOpen(true)}><Plus size={17} />Nueva solicitud</Button>} />
+      <div className="notice-note"><CircleAlert size={17} />Vista de demostración: estas solicitudes todavía no se guardan en el sistema.</div>
       <div className="workflow-tabs">{['Todos', 'Pendiente', 'Aprobado', 'En proceso', 'Cerrado'].map((item) => <Button key={item} variant={filter === item ? 'primary' : 'secondary'} onClick={() => setFilter(item)}>{item}</Button>)}</div>
-      <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>Solicitud</th><th>Solicitante</th><th>Fecha</th><th>Aprobador</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{list.map((item) => <tr key={item.id}><td><strong>{item.id}</strong><span>{item.title}</span></td><td>{item.requester}</td><td>{item.date}</td><td>{item.approver}</td><td><Badge tone={statusTone(item.status)}>{item.status}</Badge></td><td><div className="row-actions">{item.status === 'Pendiente' && <Button variant="ghost" onClick={() => approve(item.id, 'Aprobado')}><Check size={16} />Aprobar</Button>}{mode === 'Acceso' && item.status === 'Aprobado' && <Button variant="danger" onClick={() => approve(item.id, 'Revocado')}><LockKeyhole size={15} />Revocar</Button>}{mode === 'Servicio' && item.status === 'En proceso' && <Button variant="ghost" onClick={() => approve(item.id, 'Cerrado')}><CheckCircle2 size={16} />Cerrar</Button>}</div></td></tr>)}</tbody></table></div></Card>
+      <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>Solicitud</th><th>Solicitante</th><th>Fecha</th><th>Aprobador</th><th>Estado</th>{staff && <th>Acciones</th>}</tr></thead><tbody>{list.map((item) => <tr key={item.id}><td><strong>{item.id}</strong><span>{item.title}</span></td><td>{item.requester}</td><td>{item.date}</td><td>{item.approver}</td><td><Badge tone={statusTone(item.status)}>{item.status}</Badge></td>{staff && <td><div className="row-actions">{item.status === 'Pendiente' && <Button variant="ghost" onClick={() => approve(item.id, 'Aprobado')}><Check size={16} />Aprobar</Button>}{mode === 'Acceso' && item.status === 'Aprobado' && <Button variant="danger" onClick={() => approve(item.id, 'Revocado')}><LockKeyhole size={15} />Revocar</Button>}{mode === 'Servicio' && item.status === 'En proceso' && <Button variant="ghost" onClick={() => approve(item.id, 'Cerrado')}><CheckCircle2 size={16} />Cerrar</Button>}</div></td>}</tr>)}</tbody></table></div></Card>
       <Modal open={open} onClose={() => setOpen(false)} title={mode === 'Acceso' ? 'Solicitar acceso' : 'Registrar solicitud'} footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={create}>Enviar solicitud</Button></>}>
         <label className="field-label">{mode === 'Acceso' ? 'Sistema o recurso' : 'Servicio'}<Select>{services.slice(0, 5).map((service) => <option key={service.id}>{service.name}</option>)}</Select></label>
         {mode === 'Acceso' && <label className="field-label">Nivel de permiso<Select><option>Solo lectura</option><option>Editor</option><option>Administrador</option></Select></label>}
@@ -438,7 +381,7 @@ function Administration({ currentId, notify }: { currentId: string; notify: (mes
       {tab === 'Cursos' && <CoursesPanel creating={creatingCourse} onCloseCreate={() => setCreatingCourse(false)} notify={notify} />}
       {tab === 'Auditoría' && <AuditPanel />}
       {tab === 'Servicios' && <ServicesPanel creating={creatingService} onCloseCreate={() => setCreatingService(false)} notify={notify} />}
-      {tab === 'Configuración SLA' && <div className="sla-config">{[['Incidente crítico', '15 min', '2 horas'], ['Prioridad alta', '30 min', '4 horas'], ['Prioridad media', '2 horas', '8 horas'], ['Prioridad baja', '4 horas', '24 horas']].map((item, index) => <Card key={item[0]}><div><Badge tone={['danger', 'pink', 'blue', 'neutral'][index] as 'danger'}>{item[0]}</Badge><h3>{item[0]}</h3></div><label className="field-label">Primera respuesta<Input defaultValue={item[1]} /></label><label className="field-label">Resolución objetivo<Input defaultValue={item[2]} /></label><Button variant="secondary" onClick={() => notify('SLA actualizado')}>Guardar</Button></Card>)}</div>}
+      {tab === 'Configuración SLA' && <SlaConfigPanel notify={notify} />}
     </>
   )
 }

@@ -353,3 +353,23 @@ td:first-child strong, td:first-child span { display: block; } td:first-child st
 .page-header > .btn { flex-shrink: 0; white-space: nowrap; }
 .my-course-actions { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin-top: .8rem; font-size: .72rem; }
 .cancel-confirm { margin-top: .8rem; color: #8a2f3d; background: var(--pink-soft); }
+
+/* Tickets: prioridad automática y plazos */
+.priority-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; padding: .9rem; background: #f7f6fb; border-radius: .85rem; }
+.priority-preview > div { display: flex; flex-direction: column; gap: .3rem; }
+.priority-preview > div span { color: var(--ink-3); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.priority-preview .badge { align-self: flex-start; }
+.priority-preview p { grid-column: 1 / -1; color: var(--ink-2); font-size: .74rem; line-height: 1.5; }
+.deadlines { display: grid; gap: .5rem; }
+.deadline-row { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: .75rem; }
+.deadline-row > svg { color: var(--lavender-strong); }
+.deadline-row > div { display: flex; flex: 1; flex-direction: column; }
+.deadline-row strong { font-size: .8rem; }
+.deadline-row span { color: var(--ink-3); font-size: .72rem; }
+.staff-actions { display: flex; flex-direction: column; align-items: flex-start; gap: .7rem; padding-top: .3rem; border-top: 1px solid var(--border); }
+.staff-actions .inline-form { align-self: stretch; }
+.sla-breached, .sla-missed { color: #a3364a !important; font-weight: 700; }
+.sla-at_risk { color: #8a5a12 !important; font-weight: 700; }
+td > span.muted { display: inline; }
+@media (max-width: 640px) { .priority-preview { grid-template-columns: 1fr; } }
+.deadlines .muted { font-size: .72rem; line-height: 1.5; }

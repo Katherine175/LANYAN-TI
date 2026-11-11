@@ -1,5 +1,7 @@
 package pe.edu.unp.lanyan.catalog.api;
 
+import pe.edu.unp.lanyan.catalog.domain.ServicePriority;
+import pe.edu.unp.lanyan.catalog.domain.SlaPolicy;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -25,7 +27,16 @@ public final class CatalogDtos {
     public record ServiceWriteRequest(@NotBlank @Size(max = 120) String name, @NotBlank @Size(max = 1000) String description,
             @NotNull UUID categoryId, @NotBlank @Size(max = 120) String owner, @NotNull ServiceIcon icon, ServiceLifecycle lifecycleStatus,
             @NotNull @DecimalMin("0.00") @DecimalMax("100.00") @Digits(integer = 3, fraction = 2) BigDecimal availabilityTarget,
-            @NotNull @Min(1) @Max(525600) Integer responseTargetMinutes, @PositiveOrZero Long version) { }
+            @Min(1) @Max(525600) Integer responseTargetMinutes, @PositiveOrZero Long version, ServicePriority defaultPriority) { }
+
+    public record SlaPolicyView(ServicePriority priority, int firstResponseMinutes, int resolutionMinutes, Long version) {
+        public static SlaPolicyView of(SlaPolicy policy) {
+            return new SlaPolicyView(policy.getPriority(), policy.getFirstResponseMinutes(), policy.getResolutionMinutes(), policy.getVersion());
+        }
+    }
+
+    public record SlaPolicyWriteRequest(@NotNull @Min(1) @Max(10080) Integer firstResponseMinutes,
+            @NotNull @Min(1) @Max(43200) Integer resolutionMinutes, @NotNull @PositiveOrZero Long version) { }
 
     public record OperationalStatusRequest(@NotNull OperationalStatus status, @NotNull @PositiveOrZero Long version) { }
 
@@ -35,10 +46,10 @@ public final class CatalogDtos {
 
     public record ServiceView(UUID id, String code, String name, String description, CategoryView category, String owner,
             ServiceIcon icon, ServiceLifecycle lifecycleStatus, OperationalStatus operationalStatus,
-            BigDecimal availabilityTarget, int responseTargetMinutes, Long version) {
+            BigDecimal availabilityTarget, int responseTargetMinutes, ServicePriority defaultPriority, Long version) {
         public static ServiceView of(ItService s) {
             return new ServiceView(s.getId(), s.getCode(), s.getName(), s.getDescription(), CategoryView.of(s.getCategory()), s.getOwner(),
-                    s.getIcon(), s.getLifecycleStatus(), s.getOperationalStatus(), s.getAvailabilityTarget(), s.getResponseTargetMinutes(), s.getVersion());
+                    s.getIcon(), s.getLifecycleStatus(), s.getOperationalStatus(), s.getAvailabilityTarget(), s.getResponseTargetMinutes(), s.getDefaultPriority(), s.getVersion());
         }
     }
 }

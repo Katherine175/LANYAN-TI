@@ -27,4 +27,9 @@ public interface ItServiceRepository extends JpaRepository<ItService, UUID> {
 
     @Query(value = "select nextval('catalog_service_code_seq')", nativeQuery = true)
     long nextCodeNumber();
+
+    /** Mantiene la respuesta objetivo del catálogo igual a la del SLA de su prioridad. */
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE catalog_services SET response_target_minutes = :minutes, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE default_priority = :priority", nativeQuery = true)
+    int syncResponseTarget(String priority, int minutes);
 }

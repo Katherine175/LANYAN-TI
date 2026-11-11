@@ -30,6 +30,7 @@ public class ItService {
     @Enumerated(EnumType.STRING) @Column(name = "operational_status", nullable = false, length = 16) private OperationalStatus operationalStatus;
     @Column(name = "availability_target", nullable = false, precision = 5, scale = 2) private BigDecimal availabilityTarget;
     @Column(name = "response_target_minutes", nullable = false) private int responseTargetMinutes;
+    @Enumerated(EnumType.STRING) @Column(name = "default_priority", nullable = false, length = 16) private ServicePriority defaultPriority = ServicePriority.MEDIUM;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version private Long version;
@@ -58,6 +59,15 @@ public class ItService {
         this.updatedAt = Instant.now();
     }
 
+    /** Prioridad con la que nacen sus tickets; Crítica nunca es automática. */
+    public void changeDefaultPriority(ServicePriority priority, int firstResponseMinutes) {
+        if (priority == ServicePriority.CRITICAL) throw new IllegalArgumentException("La prioridad Crítica solo la asigna un técnico.");
+        this.defaultPriority = java.util.Objects.requireNonNull(priority);
+        // La respuesta objetivo del catálogo es la misma que se aplica a sus tickets.
+        this.responseTargetMinutes = firstResponseMinutes;
+        this.updatedAt = Instant.now();
+    }
+
     public void changeOperationalStatus(OperationalStatus status) {
         this.operationalStatus = Objects.requireNonNull(status);
         this.updatedAt = Instant.now();
@@ -74,5 +84,6 @@ public class ItService {
     public OperationalStatus getOperationalStatus() { return operationalStatus; }
     public BigDecimal getAvailabilityTarget() { return availabilityTarget; }
     public int getResponseTargetMinutes() { return responseTargetMinutes; }
+    public ServicePriority getDefaultPriority() { return defaultPriority; }
     public Long getVersion() { return version; }
 }

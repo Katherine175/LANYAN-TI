@@ -1,5 +1,7 @@
 package pe.edu.unp.lanyan.catalog.application;
 
+import pe.edu.unp.lanyan.catalog.domain.ServicePriority;
+import pe.edu.unp.lanyan.catalog.infrastructure.SlaPolicyRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
@@ -31,11 +33,13 @@ public class ServiceCatalog {
     private final ItServiceRepository services;
     private final ServiceCategoryRepository categories;
     private final AuditService audit;
+    private final SlaPolicyRepository policies;
 
-    public ServiceCatalog(ItServiceRepository services, ServiceCategoryRepository categories, AuditService audit) {
+    public ServiceCatalog(ItServiceRepository services, ServiceCategoryRepository categories, AuditService audit, SlaPolicyRepository policies) {
         this.services = services;
         this.categories = categories;
         this.audit = audit;
+        this.policies = policies;
     }
 
     @PreAuthorize("hasAuthority('portal:it:access')")
@@ -75,8 +79,11 @@ public class ServiceCatalog {
     public ServiceView create(ServiceWriteRequest request) {
         if (services.existsByNameIgnoreCase(request.name().trim())) throw duplicateName();
         var code = "SRV-%03d".formatted(services.nextCodeNumber());
-        var service = services.saveAndFlush(new ItService(code, request.name(), request.description(), category(request.categoryId()),
-                request.owner(), request.icon(), request.lifecycleStatus(), request.availabilityTarget(), request.responseTargetMinutes()));
+        var priority = request.defaultPriority() == null ? ServicePriority.MEDIUM : request.defaultPriority();
+        var created = new ItService(code, request.name(), request.description(), category(request.categoryId()),
+                request.owner(), request.icon(), request.lifecycleStatus(), request.availabilityTarget(), firstResponse(priority));
+        created.changeDefaultPriority(priority, firstResponse(priority));
+        var service = services.saveAndFlush(created);
         audit.record(AuditAction.CATALOG_SERVICE_CREATED, TARGET, service.getId().toString(), code + " " + service.getName());
         return ServiceView.of(service);
     }
@@ -88,11 +95,15 @@ public class ServiceCatalog {
         requireVersion(service, request.version());
         if (services.existsByNameIgnoreCaseAndIdNot(request.name().trim(), id)) throw duplicateName();
         var previous = service.getLifecycleStatus();
+        var previousPriority = service.getDefaultPriority();
+        var priority = request.defaultPriority() == null ? previousPriority : request.defaultPriority();
         service.revise(request.name(), request.description(), category(request.categoryId()), request.owner(), request.icon(),
-                request.lifecycleStatus(), request.availabilityTarget(), request.responseTargetMinutes());
+                request.lifecycleStatus(), request.availabilityTarget(), firstResponse(priority));
+        service.changeDefaultPriority(priority, firstResponse(priority));
         var saved = services.saveAndFlush(service);
         audit.record(AuditAction.CATALOG_SERVICE_UPDATED, TARGET, id.toString(),
-                saved.getCode() + " estado " + previous + " a " + saved.getLifecycleStatus());
+                saved.getCode() + " estado " + previous + " a " + saved.getLifecycleStatus()
+                        + (previousPriority == priority ? "" : "; prioridad " + previousPriority + " a " + priority));
         return ServiceView.of(saved);
     }
 
@@ -110,6 +121,13 @@ public class ServiceCatalog {
         audit.record(AuditAction.CATALOG_SERVICE_STATUS_CHANGED, TARGET, id.toString(),
                 saved.getCode() + " " + previous + " a " + saved.getOperationalStatus());
         return ServiceView.of(saved);
+    }
+
+    private int firstResponse(ServicePriority priority) {
+        if (priority == ServicePriority.CRITICAL) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PRIORITY_NOT_ALLOWED", "La prioridad Crítica solo la asigna un técnico en cada ticket.");
+        }
+        return policies.findById(priority).orElseThrow().getFirstResponseMinutes();
     }
 
     private ServiceCategory category(UUID id) {

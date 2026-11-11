@@ -1,2 +1,2 @@
-/** Reserva el módulo de tickets y Service Desk; sin implementación funcional. */
+/** Tickets de soporte: prioridad según el servicio y plazos SLA en horario de atención. */
 package pe.edu.unp.lanyan.tickets;

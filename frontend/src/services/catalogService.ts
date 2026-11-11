@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { Page } from './identityService'
+import type { Priority } from './ticketService'
 
 export type ServiceIcon = 'MONITOR' | 'GRADUATION' | 'CREDIT' | 'MAIL' | 'WIFI' | 'PROJECTOR' | 'HEADSET'
 export type ServiceLifecycle = 'DRAFT' | 'PUBLISHED' | 'RETIRED'
@@ -22,6 +23,7 @@ export interface CatalogService {
   operationalStatus: OperationalStatus
   availabilityTarget: number
   responseTargetMinutes: number
+  defaultPriority: Priority
   version: number
 }
 
@@ -33,7 +35,7 @@ export interface ServiceInput {
   icon: ServiceIcon
   lifecycleStatus: ServiceLifecycle
   availabilityTarget: number
-  responseTargetMinutes: number
+  defaultPriority: Exclude<Priority, 'CRITICAL'>
   version?: number
 }
 
