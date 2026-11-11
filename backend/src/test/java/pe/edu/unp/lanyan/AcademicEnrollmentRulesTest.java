@@ -90,7 +90,7 @@ class AcademicEnrollmentRulesTest {
 
     @Test
     void duplicatesAreRejectedBeforeWritingAnotherRow() {
-        when(enrollments.existsByStudent_IdAndSection_Id(student.getId(), section.getId())).thenReturn(true);
+        when(enrollments.findOneByStudent_IdAndSection_Id(student.getId(), section.getId())).thenReturn(java.util.Optional.of(new Enrollment(student, section)));
         var ex = catchThrowableOfType(() -> service.create(request()), AcademicException.class);
         assertThat(ex.code()).isEqualTo("ENROLLMENT_EXISTS");
         verify(enrollments, never()).saveAndFlush(any());

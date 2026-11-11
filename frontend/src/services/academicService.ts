@@ -129,6 +129,10 @@ export const myCourses = () => api<Page<StudentCourse>>('/students/me/courses?pa
 export const mySchedule = () => api<Page<SectionSchedule>>('/students/me/schedule?page=0&size=100')
 export const myMaterials = () => api<Page<Material>>('/students/me/materials?page=0&size=100')
 export const enrollInSection = (sectionId: string) => api<unknown>('/students/me/enrollments', { method: 'POST', body: { sectionId } })
+export const cancelEnrollment = (enrollmentId: string) => api<unknown>(`/students/me/enrollments/${enrollmentId}/cancel`, { method: 'POST' })
+
+/** Fecha de hoy en Lima como "AAAA-MM-DD", para comparar con las fechas de las secciones. */
+export const todayInLima = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
 
 export const getStudentProfile = (userId: string) => api<StudentProfile>(`/academic/students/${userId}/profile`)
 export const saveStudentProfile = (userId: string, studentCode: string) =>

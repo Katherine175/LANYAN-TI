@@ -25,4 +25,9 @@ public class StudentEnrollmentController {
         var enrollment = enrollments.enrollSelf(principal.getId(), request.sectionId());
         return ResponseEntity.created(URI.create("/api/v1/students/me/courses")).body(enrollment);
     }
+
+    @PostMapping("/{id}/cancel")
+    public EnrollmentView cancel(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID id) {
+        return enrollments.cancelSelf(principal.getId(), id);
+    }
 }

@@ -351,3 +351,5 @@ td:first-child strong, td:first-child span { display: block; } td:first-child st
 @media (max-width: 900px) { .my-course-body { grid-template-columns: 1fr; } }
 
 .page-header > .btn { flex-shrink: 0; white-space: nowrap; }
+.my-course-actions { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin-top: .8rem; font-size: .72rem; }
+.cancel-confirm { margin-top: .8rem; color: #8a2f3d; background: var(--pink-soft); }

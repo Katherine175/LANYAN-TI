@@ -115,6 +115,72 @@ class SelfEnrollmentTest {
         }
     }
 
+    /** Sección que empieza dentro de un mes: todavía se puede anular. */
+    UUID upcomingSection(Course course, String code, int capacity) {
+        var start = LocalDate.now(java.time.ZoneId.of("America/Lima")).plusDays(30);
+        return sections.saveAndFlush(new CourseSection(course, code, "TEST-2027", start, start.plusMonths(3), capacity, SectionStatus.OPEN)).getId();
+    }
+
+    @Test
+    void studentCancelsBeforeTheStartFreesTheSeatAndCanComeBack() throws Exception {
+        var course = course(CourseStatus.ACTIVE);
+        var sectionId = upcomingSection(course, "A", 1);
+        var otherSection = upcomingSection(course, "B", 5);
+        try (var client = new Client()) {
+            client.login(student(true));
+            var created = client.send("POST", "/api/v1/students/me/enrollments", body(sectionId));
+            String id = JsonPath.read(created.body(), "$.id");
+
+            var cancelled = client.send("POST", "/api/v1/students/me/enrollments/" + id + "/cancel", null);
+            assertThat(cancelled.statusCode()).isEqualTo(200);
+            assertThat(JsonPath.<String>read(cancelled.body(), "$.status")).isEqualTo("CANCELLED");
+            assertThat(enrollments.countBySection_IdAndStatus(sectionId, EnrollmentStatus.ENROLLED)).isZero();
+            assertThat(code(client.send("POST", "/api/v1/students/me/enrollments/" + id + "/cancel", null))).isEqualTo("ENROLLMENT_NOT_ACTIVE");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE action='ENROLLMENT_CANCELLED' AND target_id=?", Long.class, id)).isEqualTo(1);
+
+            // Tras anular puede elegir otra sección del mismo curso o volver a la misma.
+            var other = client.send("POST", "/api/v1/students/me/enrollments", body(otherSection));
+            assertThat(other.statusCode()).isEqualTo(201);
+            client.send("POST", "/api/v1/students/me/enrollments/" + JsonPath.read(other.body(), "$.id") + "/cancel", null);
+            var again = client.send("POST", "/api/v1/students/me/enrollments", body(sectionId));
+            assertThat(again.statusCode()).isEqualTo(201);
+            assertThat(JsonPath.<String>read(again.body(), "$.id")).isEqualTo(id);
+            assertThat(enrollments.countBySection_IdAndStatus(sectionId, EnrollmentStatus.ENROLLED)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void studentCannotCancelOnceTheSectionHasStarted() throws Exception {
+        var sectionId = section(course(CourseStatus.ACTIVE), "A", 10, SectionStatus.OPEN);
+        try (var client = new Client()) {
+            client.login(student(true));
+            String id = JsonPath.read(client.send("POST", "/api/v1/students/me/enrollments", body(sectionId)).body(), "$.id");
+            var response = client.send("POST", "/api/v1/students/me/enrollments/" + id + "/cancel", null);
+            assertThat(response.statusCode()).isEqualTo(409);
+            assertThat(code(response)).isEqualTo("SECTION_ALREADY_STARTED");
+        }
+        assertThat(enrollments.countBySection_IdAndStatus(sectionId, EnrollmentStatus.ENROLLED)).isEqualTo(1);
+    }
+
+    @Test
+    void nobodyCancelsSomeoneElsesEnrollment() throws Exception {
+        var sectionId = upcomingSection(course(CourseStatus.ACTIVE), "A", 10);
+        String id;
+        try (var owner = new Client()) {
+            owner.login(student(true));
+            id = JsonPath.read(owner.send("POST", "/api/v1/students/me/enrollments", body(sectionId)).body(), "$.id");
+        }
+        try (var intruder = new Client()) {
+            intruder.login(student(true));
+            assertThat(code(intruder.send("POST", "/api/v1/students/me/enrollments/" + id + "/cancel", null))).isEqualTo("ENROLLMENT_NOT_FOUND");
+        }
+        try (var admin = new Client()) {
+            admin.login(ADMIN);
+            assertThat(admin.send("POST", "/api/v1/students/me/enrollments/" + id + "/cancel", null).statusCode()).isEqualTo(403);
+        }
+        assertThat(enrollments.countBySection_IdAndStatus(sectionId, EnrollmentStatus.ENROLLED)).isEqualTo(1);
+    }
+
     @Test
     void studentCannotTakeTwoSeatsInTheSameCourse() throws Exception {
         var course = course(CourseStatus.ACTIVE);

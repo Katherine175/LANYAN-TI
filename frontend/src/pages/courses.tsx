@@ -3,8 +3,8 @@ import { BookOpen, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, Clock3
 import { ApiError } from '../services/api'
 import { Badge, Button, Card, Input, Modal, PageHeader, Select, Textarea } from '../components/ui'
 import {
-  courseStatusLabels, createCourse, createMaterial, createSchedule, createSection, enrollInSection, formatDate, getCourseCatalog, listCourses,
-  listMaterials, listSchedules, listSections, materialTypeLabels, modalityLabels, myCourses, myMaterials, mySchedule, sectionStatusLabels, shortTime, weekdayLabels,
+  cancelEnrollment, courseStatusLabels, createCourse, createMaterial, createSchedule, createSection, enrollInSection, formatDate, getCourseCatalog, listCourses,
+  listMaterials, listSchedules, listSections, materialTypeLabels, modalityLabels, myCourses, myMaterials, mySchedule, sectionStatusLabels, shortTime, todayInLima, weekdayLabels,
   type CatalogCourse, type CatalogSection, type Course, type CourseStatus, type Material, type MaterialType, type Modality, type Schedule,
   type Section, type SectionSchedule, type SectionStatus, type StudentCourse, type Weekday,
 } from '../services/academicService'
@@ -156,20 +156,37 @@ function SectionSummary({ section, children }: { section: CatalogSection; childr
 
 /* ---------- Mis cursos (estudiante) ---------- */
 
-export function MyCourses({ onOpenCatalog }: { onOpenCatalog: () => void }) {
+export function MyCourses({ onOpenCatalog, notify }: { onOpenCatalog: () => void; notify: (message: string) => void }) {
   const [courses, setCourses] = useState<StudentCourse[]>([])
   const [schedules, setSchedules] = useState<SectionSchedule[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [profileMissing, setProfileMissing] = useState(false)
+  const [cancelling, setCancelling] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    Promise.all([myCourses(), mySchedule(), myMaterials()])
-      .then(([mine, times, files]) => { setCourses(mine.content); setSchedules(times.content); setMaterials(files.content) })
-      .catch((e) => { if (isMissingProfile(e)) setProfileMissing(true); else setError(errorText(e)) })
-      .finally(() => setLoading(false))
-  }, [])
+  const load = () => Promise.all([myCourses(), mySchedule(), myMaterials()])
+    .then(([mine, times, files]) => { setCourses(mine.content); setSchedules(times.content); setMaterials(files.content); setError('') })
+    .catch((e) => { if (isMissingProfile(e)) setProfileMissing(true); else setError(errorText(e)) })
+    .finally(() => setLoading(false))
+  useEffect(() => { void load() }, [])
+
+  const cancel = async (item: StudentCourse) => {
+    setBusy(true)
+    try {
+      await cancelEnrollment(item.enrollmentId)
+      notify(`Anulaste tu matrícula en ${item.course.name}`)
+      setCancelling(null)
+      await load()
+    } catch (e) {
+      setError(errorText(e))
+      setCancelling(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const today = todayInLima()
 
   const active = courses.filter((item) => item.enrollmentStatus === 'ENROLLED')
   const weekOrder = Object.keys(weekdayLabels)
@@ -194,6 +211,10 @@ export function MyCourses({ onOpenCatalog }: { onOpenCatalog: () => void }) {
                 <div><span className="course-language">{item.course.language}{item.course.level ? ` · ${item.course.level}` : ''}</span><h2>{item.course.name}</h2><p>Sección {item.section.code} · {item.section.academicPeriod} · {formatDate(item.section.startDate)} al {formatDate(item.section.endDate)}</p></div>
                 {item.section.status !== 'OPEN' && <Badge tone={item.section.status === 'CANCELLED' ? 'danger' : 'neutral'}>Sección {sectionStatusLabels[item.section.status].toLowerCase()}</Badge>}
               </div>
+              {/* Se puede anular hasta el día anterior al inicio; luego lo gestiona la administración. */}
+              {item.section.startDate > today && (cancelling === item.enrollmentId
+                ? <div className="enroll-confirm cancel-confirm"><span>¿Anular tu matrícula en {item.course.name}, sección {item.section.code}? Liberarás tu cupo y podrías no encontrarlo libre después.</span><div className="row-actions"><Button variant="secondary" onClick={() => setCancelling(null)} disabled={busy}>Mantener matrícula</Button><Button variant="danger" onClick={() => void cancel(item)} disabled={busy}>{busy ? 'Anulando…' : 'Sí, anular'}</Button></div></div>
+                : <div className="my-course-actions"><span className="muted">Puedes anularla hasta antes del {formatDate(item.section.startDate)}.</span><Button variant="ghost" onClick={() => setCancelling(item.enrollmentId)} disabled={cancelling !== null}>Anular matrícula</Button></div>)}
               <div className="my-course-body">
                 <div>
                   <h3><Clock3 size={15} />Horario</h3>

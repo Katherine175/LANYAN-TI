@@ -29,6 +29,20 @@ public class Enrollment {
         this.updatedAt = enrolledAt;
     }
 
+    /** El cupo se libera; la fila se conserva como historial. */
+    public void cancel() {
+        if (status != EnrollmentStatus.ENROLLED) throw new IllegalStateException("Solo se anula una matrícula vigente.");
+        this.status = EnrollmentStatus.CANCELLED;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Volver a la misma sección reutiliza la fila: la base admite una matrícula por estudiante y sección. */
+    public void reactivate() {
+        if (status != EnrollmentStatus.CANCELLED) throw new IllegalStateException("Solo se reactiva una matrícula anulada.");
+        this.status = EnrollmentStatus.ENROLLED;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() { return id; }
     public StudentProfile getStudent() { return student; }
     public CourseSection getSection() { return section; }

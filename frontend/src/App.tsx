@@ -109,7 +109,7 @@ function App() {
           {view === 'dashboard' && <Dashboard account={account} onNavigate={navigate} tickets={ticketList} />}
           {view === 'catalogo' && <Catalog canOperate={role === 'tecnico' || role === 'administrador'} notify={notify} onNavigate={navigate} />}
           {view === 'cursos' && <CourseCatalog isAdmin={role === 'administrador'} notify={notify} onOpenMyCourses={() => navigate('mis-cursos')} />}
-          {view === 'mis-cursos' && <MyCourses onOpenCatalog={() => navigate('cursos')} />}
+          {view === 'mis-cursos' && <MyCourses onOpenCatalog={() => navigate('cursos')} notify={notify} />}
           {view === 'tickets' && <TicketsPage role={role} tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'service-desk' && <ServiceDesk tickets={ticketList} setTickets={setTicketList} notify={notify} />}
           {view === 'problemas' && <Problems notify={notify} />}
