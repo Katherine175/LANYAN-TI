@@ -399,3 +399,14 @@ td > span.muted { display: inline; }
 .comment-box.internal { background: #fff8e8; border-radius: .7rem; padding: .5rem; }
 .comment-actions { align-items: center; justify-content: space-between; }
 .comments > p.muted, .inline-form > p.muted, .modal-body > p.muted { font-size: .76rem; line-height: 1.5; }
+
+/* Operaciones TI */
+.status-banner-alert { background: #fff1f3; border-color: #f2c3c9; }
+.status-banner-alert .pulse { background: #c4455a; }
+.pulse.small.degraded { background: #c98a1b; }
+.pulse.small.unavailable { background: #c4455a; }
+.availability-detail { grid-template-rows: auto auto; row-gap: .25rem; }
+.availability-detail > small { grid-column: 1 / -1; color: var(--ink-3); font-size: .66rem; }
+.timeline > div { grid-template-columns: 1.8rem 2rem 1fr auto; }
+.events-card h2 { display: flex; align-items: center; gap: .4rem; }
+.events-card .card-title .select-field { width: 12rem; }

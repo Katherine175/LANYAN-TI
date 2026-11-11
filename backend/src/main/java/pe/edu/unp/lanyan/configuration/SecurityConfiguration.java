@@ -94,6 +94,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/tickets/*/comments").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/tickets/*/comments").authenticated()
                         .requestMatchers("/api/v1/problems", "/api/v1/problems/**").hasAnyRole("TECHNICIAN", "ADMIN")
+                        .requestMatchers("/api/v1/operations/**").hasAnyRole("TECHNICIAN", "ADMIN")
                         .anyRequest().denyAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(AbstractHttpConfigurer::disable)

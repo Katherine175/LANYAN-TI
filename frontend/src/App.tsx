@@ -7,10 +7,11 @@ import {
   SlidersHorizontal, Sparkles, TicketCheck, TrendingUp,
   Wrench, X, Zap, GraduationCap, type LucideIcon,
 } from 'lucide-react'
-import { articles, services } from './data/mockData'
+import { articles } from './data/mockData'
 import type { Role, RouteKey } from './types'
 import { AccessPage, ServiceRequestsPage } from './pages/workflows'
 import { ProblemsPage } from './pages/problems'
+import { OperationsPage } from './pages/operations'
 import { DashboardTickets, isStaff, ServiceDesk, SlaConfigPanel, TicketsPage, useTickets, useTicketStats } from './pages/tickets'
 import { Badge, Button, Card, Input, Modal, PageHeader, Progress, Select } from './components/ui'
 import { Catalog, ServicesPanel } from './pages/catalog'
@@ -115,7 +116,7 @@ function App() {
           {view === 'problemas' && <ProblemsPage notify={notify} />}
           {view === 'accesos' && <AccessPage role={role} email={account.email} notify={notify} />}
           {view === 'solicitudes' && <ServiceRequestsPage role={role} email={account.email} notify={notify} />}
-          {view === 'operaciones' && <Operations notify={notify} />}
+          {view === 'operaciones' && <OperationsPage notify={notify} />}
           {view === 'conocimiento' && <Knowledge notify={notify} />}
           {view === 'reportes' && <Reports notify={notify} />}
           {view === 'mejora' && <Improvement notify={notify} />}
@@ -263,20 +264,6 @@ function Dashboard({ account, role, onNavigate }: { account: Account; role: Role
         <div className="card-title"><div><h2>Actividad reciente</h2><p>{staff ? 'Últimos tickets registrados' : 'Tus últimos tickets'}</p></div><Button variant="ghost" onClick={() => onNavigate('tickets')}>Ver todos <ArrowRight size={16} /></Button></div>
         <DashboardTickets tickets={tickets} />
       </Card>
-    </>
-  )
-}
-
-function Operations({ notify }: { notify: (message: string) => void }) {
-  const [maintenance, setMaintenance] = useState(false)
-  return (
-    <>
-      <PageHeader eyebrow="Monitoreo de servicios" title="Operaciones TI" description="Disponibilidad, estado operativo y mantenimientos programados." action={<Button onClick={() => setMaintenance(true)}><Plus size={17} />Programar mantenimiento</Button>} />
-      <div className="status-banner"><div><span className="pulse" /><div><strong>Todos los sistemas operan con normalidad</strong><p>Última comprobación hace 2 minutos</p></div></div><Badge tone="mint">Operativo</Badge></div>
-      <div className="operations-grid"><Card className="availability-card"><div className="card-title"><div><h2>Disponibilidad de servicios</h2><p>Últimos 30 días</p></div><strong className="big-number">99.4%</strong></div>{services.slice(0, 6).map((service) => <div className="availability-row" key={service.id}><div><span className="pulse small" /><strong>{service.name}</strong></div><Progress value={service.availability} tone={service.availability < 98 ? 'pink' : 'mint'} /><span>{service.availability}%</span></div>)}</Card><Card><div className="card-title"><div><h2>Próximos mantenimientos</h2><p>Ventanas planificadas</p></div></div><div className="timeline"><div><span>18</span><small>JUN</small><p><strong>Actualización del aula virtual</strong><small>22:00 — 23:30 · Impacto bajo</small></p></div><div><span>22</span><small>JUN</small><p><strong>Mantenimiento de red</strong><small>08:00 — 10:00 · Laboratorio 2</small></p></div><div><span>29</span><small>JUN</small><p><strong>Respaldo de base de datos</strong><small>23:00 — 00:30 · Sin interrupción</small></p></div></div></Card></div>
-      <Modal open={maintenance} onClose={() => setMaintenance(false)} title="Programar mantenimiento" footer={<><Button variant="secondary" onClick={() => setMaintenance(false)}>Cancelar</Button><Button onClick={() => { setMaintenance(false); notify('Mantenimiento programado') }}>Programar</Button></>}>
-        <label className="field-label">Servicio<Select>{services.map((service) => <option key={service.id}>{service.name}</option>)}</Select></label><label className="field-label">Descripción<Input placeholder="Ej. Actualización de seguridad" /></label><div className="form-grid"><label className="field-label">Inicio<Input type="datetime-local" /></label><label className="field-label">Fin<Input type="datetime-local" /></label></div><label className="field-label">Impacto<Select><option>Bajo</option><option>Medio</option><option>Alto</option></Select></label>
-      </Modal>
     </>
   )
 }

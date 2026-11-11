@@ -34,12 +34,15 @@ public class ServiceCatalog {
     private final ServiceCategoryRepository categories;
     private final AuditService audit;
     private final SlaPolicyRepository policies;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
-    public ServiceCatalog(ItServiceRepository services, ServiceCategoryRepository categories, AuditService audit, SlaPolicyRepository policies) {
+    public ServiceCatalog(ItServiceRepository services, ServiceCategoryRepository categories, AuditService audit, SlaPolicyRepository policies,
+            org.springframework.context.ApplicationEventPublisher events) {
         this.services = services;
         this.categories = categories;
         this.audit = audit;
         this.policies = policies;
+        this.events = events;
     }
 
     @PreAuthorize("hasAuthority('portal:it:access')")
@@ -120,6 +123,11 @@ public class ServiceCatalog {
         var saved = services.saveAndFlush(service);
         audit.record(AuditAction.CATALOG_SERVICE_STATUS_CHANGED, TARGET, id.toString(),
                 saved.getCode() + " " + previous + " a " + saved.getOperationalStatus());
+        if (previous != saved.getOperationalStatus()) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            events.publishEvent(new ServiceStatusChanged(saved.getId(), saved.getName(), previous, saved.getOperationalStatus(),
+                    java.time.Instant.now(), auth == null ? null : auth.getName()));
+        }
         return ServiceView.of(saved);
     }
 

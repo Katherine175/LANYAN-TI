@@ -1,2 +1,2 @@
-/** Reserva el módulo de operaciones y mantenimientos; sin implementación funcional. */
+/** Operaciones TI: gestión de eventos, disponibilidad calculada desde el historial y mantenimientos programados. */
 package pe.edu.unp.lanyan.operations;
